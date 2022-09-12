@@ -1,5 +1,6 @@
 ﻿using AquaModelLibrary.AquaMethods;
 using AquaModelLibrary.Native.Fbx;
+using Pfim;
 using Reloaded.Memory.Streams;
 using System;
 using System.Collections.Generic;
@@ -14,6 +15,7 @@ using static AquaModelLibrary.AquaMethods.AquaGeneralMethods;
 using static AquaModelLibrary.AquaMethods.AquaNodeParsingMethods;
 using static AquaModelLibrary.CharacterMakingIndexMethods;
 using static AquaModelLibrary.LHIObjectDetailLayout;
+using ImageFormat = System.Drawing.Imaging.ImageFormat;
 
 namespace AquaModelLibrary.Extra
 {
@@ -396,7 +398,7 @@ namespace AquaModelLibrary.Extra
         private static void WritePng(string outFolder, string fname, byte[] ddsData)
         {
             var pngName = Path.Combine(outFolder, fname + ".png");
-            using (var image = Pfim.Pfim.FromStream(new MemoryStream(ddsData)))
+            using (var image = Pfimage.FromStream(new MemoryStream(ddsData)))
             {
                 var handle = GCHandle.Alloc(image.Data, GCHandleType.Pinned);
                 try

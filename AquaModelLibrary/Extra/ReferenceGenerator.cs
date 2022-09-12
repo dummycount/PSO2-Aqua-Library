@@ -17,6 +17,7 @@ using static AquaModelLibrary.CharacterMakingIndex;
 using static AquaModelLibrary.CharacterMakingIndexMethods;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
+using Pfim;
 
 namespace AquaModelLibrary.Extra
 {
@@ -353,7 +354,7 @@ namespace AquaModelLibrary.Extra
 
         private unsafe static Bitmap GetDDSBitMap(byte[] trueFile)
         {
-            using (var image = Pfim.Pfim.FromStream(new MemoryStream(trueFile)))
+            using (var image = Pfimage.FromStream(new MemoryStream(trueFile)))
             {
                 PixelFormat format;
 
