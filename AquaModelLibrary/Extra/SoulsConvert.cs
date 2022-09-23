@@ -31,13 +31,29 @@ namespace AquaModelLibrary.Extra
         
         public static AquaObject FlverToAqua(IFlver flver, out AquaNode aqn)
         {
+            StringBuilder dbLog = new StringBuilder();
             AquaObject aqp = new NGSAquaObject();
             //aqp.bonePalette = new List<uint>();
             aqn = new AquaNode();
+            var mirrorMat = new Matrix4x4(-1, 0, 0, 0,
+                                        0, 1, 0, 0,
+                                        0, 0, 1, 0,
+                                        0, 0, 0, 1);
             for (int i = 0; i < flver.Bones.Count; i++)
             {
                 //aqp.bonePalette.Add((uint)i);
                 var flverBone = flver.Bones[i];
+                
+                //Translation adjustment
+                var boneTranslation = flverBone.Translation;
+                boneTranslation.X = -flverBone.Translation.X;
+                flverBone.Translation = boneTranslation;
+                
+                //Rotation adjustment
+                var boneRotation = flverBone.Rotation;
+                boneRotation.Z = -boneRotation.Z;
+                flverBone.Rotation = boneRotation;
+
                 Matrix4x4 mat = flverBone.ComputeLocalTransform();
                 Matrix4x4.Decompose(mat, out var scale, out var quatRot, out var translation);
                 var parentId = flverBone.ParentIndex;
@@ -50,6 +66,7 @@ namespace AquaModelLibrary.Extra
                                                   pn.m2.X, pn.m2.Y, pn.m2.Z, pn.m2.W,
                                                   pn.m3.X, pn.m3.Y, pn.m3.Z, pn.m3.W,
                                                   pn.m4.X, pn.m4.Y, pn.m4.Z, pn.m4.W);
+                    
                     Matrix4x4.Invert(parentInvTfm, out var invParentInvTfm);
                     mat = mat * invParentInvTfm;
                 }
@@ -87,13 +104,38 @@ namespace AquaModelLibrary.Extra
             for (int i = 0; i < flver.Meshes.Count; i++)
             {
                 var mesh = flver.Meshes[i];
-                
+
                 var nodeMatrix = Matrix4x4.Identity;
 
                 //Vert data
                 var vertCount = mesh.Vertices.Count;
                 AquaObject.VTXL vtxl = new AquaObject.VTXL();
 
+                if (mesh.Dynamic > 0)
+                {
+                    if(mesh is FLVER0.Mesh flv)
+                    {
+
+                        for (int b = 0; b < flv.BoneIndices.Length; b++)
+                        {
+                            if (flv.BoneIndices[b] == -1)
+                            {
+                                break;
+                            }
+                            vtxl.bonePalette.Add((ushort)flv.BoneIndices[b]);
+                        }
+                    } else if (mesh is FLVER2.Mesh flv2)
+                    {
+                        for (int b = 0; b < flv2.BoneIndices.Count; b++)
+                        {
+                            if (flv2.BoneIndices[b] == -1)
+                            {
+                                break;
+                            }
+                            vtxl.bonePalette.Add((ushort)flv2.BoneIndices[b]);
+                        }
+                    }
+                }
                 List<int> indices = new List<int>();
                 if (flver is FLVER0)
                 {
@@ -132,13 +174,14 @@ namespace AquaModelLibrary.Extra
                     throw new Exception("Unexpected flver variant");
                 }
 
+                dbLog.AppendLine($"Mesh {i}");
                 for (int v = 0; v < vertCount; v++)
                 {
                     var vert = mesh.Vertices[v];
-                    vtxl.vertPositions.Add(vert.Position);
+                    vtxl.vertPositions.Add(Vector3.Transform(vert.Position, mirrorMat));
                     if(flver is FLVER0)
                     {
-                        vtxl.vertNormals.Add(-vert.Normal);
+                        vtxl.vertNormals.Add(Vector3.Transform(vert.Normal, mirrorMat));
                     } else
                     {
                         vtxl.vertNormals.Add(vert.Normal);
@@ -180,6 +223,7 @@ namespace AquaModelLibrary.Extra
                     {
                         vtxl.vertWeights.Add(new Vector4(vert.BoneWeights[0], vert.BoneWeights[1], vert.BoneWeights[2], vert.BoneWeights[3]));
                         vtxl.vertWeightIndices.Add(new byte[] { (byte)vert.BoneIndices[0], (byte)vert.BoneIndices[1], (byte)vert.BoneIndices[2], (byte)vert.BoneIndices[3] });
+                        dbLog.AppendLine($"{vert.BoneIndices[0]} {vert.BoneIndices[1]} {vert.BoneIndices[2]} {vert.BoneIndices[3] } | {vert.BoneWeights[0]} {vert.BoneWeights[1]} {vert.BoneWeights[2]} {vert.BoneWeights[3]}");
                     } else if(vert.BoneIndices.Length > 0)
                     {
                         vtxl.vertWeights.Add(new Vector4(1, 0, 0, 0));
@@ -199,13 +243,21 @@ namespace AquaModelLibrary.Extra
                 AquaObject.GenericTriangles genMesh = new AquaObject.GenericTriangles();
 
                 List<Vector3> triList = new List<Vector3>();
-                for (int id = 0; id < indices.Count - 2; id += 3)
+                if (flver is FLVER0)
                 {
-                    ushort vi1 = (ushort)indices[id];
-                    ushort vi2 = (ushort)indices[id + 1];
-                    ushort vi3 = (ushort)indices[id + 2];
-                    triList.Add(new Vector3(vi1, vi2, vi3));
+                    for (int id = 0; id < indices.Count - 2; id += 3)
+                    {
+                        triList.Add(new Vector3(indices[id], indices[id + 1], indices[id + 2]));
+                    }
                 }
+                else
+                {
+                    for (int id = 0; id < indices.Count - 2; id += 3)
+                    {
+                        triList.Add(new Vector3(indices[id], indices[id + 1], indices[id + 2]));
+                    }
+                }
+
 
                 genMesh.triList = triList;
 
@@ -230,6 +282,7 @@ namespace AquaModelLibrary.Extra
                 aqp.tempMats.Add(mat);
             }
 
+            File.WriteAllText("C:\\testlog.txt", dbLog.ToString());
             return aqp;
         }
     }
