@@ -49,6 +49,7 @@ namespace AquaModelTool
             debugToolStripMenuItem.Visible = false;        
             debug2ToolStripMenuItem.Visible = false;        
 #endif
+            filenameButton.Enabled = false;
             this.Text = GetTitleString();
         }
 
@@ -3547,7 +3548,40 @@ namespace AquaModelTool
 
         public string GetTitleString()
         {
-            return $"Aqua Model Tool {buildDate.ToString("yyyy-MM-dd h:mm tt")} - " + Path.GetFileName(currentFile);
+            filenameButton.Text = Path.GetFileName(currentFile);
+            return $"Aqua Model Tool {buildDate.ToString("yyyy-MM-dd h:mm tt")}";
+        }
+
+        private void convertModelToDemonsSoulsflverToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            using (var ctx = new Assimp.AssimpContext())
+            {
+                var formats = ctx.GetSupportedImportFormats().ToList();
+                formats.Sort();
+
+                OpenFileDialog openFileDialog;
+                openFileDialog = new OpenFileDialog()
+                {
+                    Title = "Import model file, fbx recommended (output .aqp and .aqn will write to import directory)",
+                    Filter = ""
+                };
+                string tempFilter = "(*.fbx,*.dae,*.glb,*.gltf,*.pmx,*.smd)|*.fbx;*.dae;*.glb;*.gltf;*.pmx;*.smd";
+                string tempFilter2 = "";
+                openFileDialog.Filter = tempFilter + tempFilter2;
+
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    AquaUtil aqua = new AquaUtil();
+                    ModelSet modelSet = new ModelSet();
+                    modelSet.models.Add(ModelImporter.AssimpAquaConvertFull(openFileDialog.FileName, 1, false, true, out AquaNode aqn));
+                    aqua.aquaModels.Add(modelSet);
+                    var ext = Path.GetExtension(openFileDialog.FileName);
+                    var outStr = openFileDialog.FileName.Replace(ext, "_out.flver");
+
+                    aqua.aquaModels.Clear();
+                    AquaUIOpenFile(outStr);
+                }
+            }
         }
     }
 }
