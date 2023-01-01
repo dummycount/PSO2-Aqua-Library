@@ -250,7 +250,7 @@ namespace AquaModelTool
             }
         }
 
-        public void AquaUIOpenFile(string str = null)
+        public bool AquaUIOpenFile(string str = null)
         {
             string file = aquaUI.confirmFile(str);
             if (file != null)
@@ -334,12 +334,14 @@ namespace AquaModelTool
                         break;
                     default:
                         MessageBox.Show("Invalid File");
-                        return;
+                        return false;
                 }
                 filePanel.Controls.Add(control);
                 control.Dock = DockStyle.Fill;
                 control.BringToFront();
             }
+
+            return true;
         }
 
         private void ClearData()
@@ -888,9 +890,9 @@ namespace AquaModelTool
                 string key = shad.pixelShader.GetString() + " " + shad.vertexShader.GetString();
                 string shad0Line = "{" + $"\"{key}\", " + shad.unk0.ToString() + " },\n";
 
-                if (shad is NGSAquaObject.NGSSHAD && (((NGSAquaObject.NGSSHAD)shad).shadDetailOffset != 0 || ((NGSAquaObject.NGSSHAD)shad).shadExtraOffset != 0))
+                if (shad.isNGS && (shad.shadDetailOffset != 0 || shad.shadExtraOffset != 0))
                 {
-                    NGSAquaObject.NGSSHAD ngsShad = (NGSAquaObject.NGSSHAD)shad;
+                    AquaObject.SHAD ngsShad = shad;
 
                     string data = "";
                     string detData = "";
@@ -1511,35 +1513,6 @@ namespace AquaModelTool
                     sb.AppendLine(num.ToString() + " " + num.ToString("X"));
                 }
                 File.WriteAllText(Path.GetDirectoryName(openFileDialog.FileNames[0]) + "\\" + "figEffectTypes.txt", sb.ToString());
-            }
-        }
-
-        private void spirefierToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            if (aquaUI.aqua.aquaModels.Count == 0)
-            {
-                return;
-            }
-            decimal value = 0;
-
-            if (AquaUICommon.ShowInputDialog(ref value) == DialogResult.OK)
-            {
-                //Spirefier
-                for (int i = 0; i < aquaUI.aqua.aquaModels[0].models.Count; i++)
-                {
-                    var model = aquaUI.aqua.aquaModels[0].models[i];
-                    for (int j = 0; j < model.vtxlList[0].vertPositions.Count; j++)
-                    {
-                        var vec3 = model.vtxlList[0].vertPositions[j];
-                        if (vec3.Y > (float)value)
-                        {
-                            vec3.Y *= 10000;
-                            model.vtxlList[0].vertPositions[j] = vec3;
-                        }
-                    }
-
-                    model.objc.bounds = AquaObjectMethods.GenerateBounding(model.vtxlList);
-                }
             }
         }
 
@@ -2515,6 +2488,8 @@ namespace AquaModelTool
                 AquaUtil aqua = new AquaUtil();
                 aqua.ReadBones(openFileDialog.FileName);
 
+                StringBuilder sb3 = new StringBuilder();
+                StringBuilder sb2 = new StringBuilder();
                 StringBuilder sb = new StringBuilder();
                 var bn = aqua.aquaBones[0];
                 for (int i = 0; i < bn.nodeList.Count; i++)
@@ -2523,7 +2498,7 @@ namespace AquaModelTool
                     sb.AppendLine($"=== ({i}) {node.boneName.curString}:");
                     sb.AppendLine($"Bone Short 1 {node.boneShort1.ToString("X")} | Bone Short 2 {node.boneShort2.ToString("X")}");
                     sb.AppendLine($"Animated Flag {node.animatedFlag}");
-                    sb.AppendLine($"First Child {node.firstChild} | Next Sibling {node.nextSibling} | NGS Sibling {node.ngsSibling} | Unk Node {node.unkNode}");
+                    sb.AppendLine($"First Child {node.firstChild} | Next Sibling {node.nextSibling} | NGS Sibling {node.ngsRotationOrderChangeCounter} | Unk Node {node.unkNode}");
                     if (i != 0)
                     {
                         sb.AppendLine($"Parent info - ({node.parentId}) {bn.nodeList[node.parentId].boneName.curString}");
@@ -2540,6 +2515,7 @@ namespace AquaModelTool
                     Vector3 localEulRot;
                     Vector3 worldEulRot = MathExtras.QuaternionToEuler(rotation);
                     Quaternion localQuat;
+                    Quaternion invParentRot = new Quaternion(-1, -1, -1, -1);
                     if (i != 0)
                     {
                         Matrix4x4.Invert(bn.nodeList[node.parentId].GetInverseBindPoseMatrix(), out var parMat);
@@ -2547,6 +2523,7 @@ namespace AquaModelTool
                         var invParRot = Quaternion.Inverse(parRot);
                         localQuat = rotation * invParRot;
                         localEulRot = MathExtras.QuaternionToEuler(rotation * invParRot);
+                        invParentRot = invParRot;
                     } else
                     {
                         localEulRot = worldEulRot;
@@ -2560,8 +2537,13 @@ namespace AquaModelTool
                     sb.AppendLine($"Inv Bind World Scale {scale.X} {scale.Y} {scale.Z}");
                     sb.AppendLine($"===");
                     sb.AppendLine($"");
+
+                    sb3.AppendLine($"{{ {{Bone {i}}}  {{NGS Sibling {node.ngsRotationOrderChangeCounter}}} {{Inverse Parent World Quaternion Rotation {invParentRot.X} {invParentRot.Y} {invParentRot.Z} {invParentRot.W}}} {{World Quaternion Rotation {rotation.X} {rotation.Y} {rotation.Z} {rotation.W}}} {{Local Euler Rotation {node.eulRot.X} {node.eulRot.Y} {node.eulRot.Z}}} {{Generated Local Euler Rot {localEulRot.X} {localEulRot.Y} {localEulRot.Z}}} }}");
+                    sb2.AppendLine($"{{ {{Bone {i}}} {{Inverse Parent World Quaternion Rotation {invParentRot.X} {invParentRot.Y} {invParentRot.Z} {invParentRot.W}}} {{World Quaternion Rotation {rotation.X} {rotation.Y} {rotation.Z} {rotation.W}}} {{Local Euler Rotation {node.eulRot.X} {node.eulRot.Y} {node.eulRot.Z}}} {{Generated Local Euler Rot {localEulRot.X} {localEulRot.Y} {localEulRot.Z}}} }}");
                 }
                 File.WriteAllText($"C:\\{Path.GetFileName(openFileDialog.FileName)}.txt", sb.ToString());
+                File.WriteAllText($"C:\\{Path.GetFileName(openFileDialog.FileName)}_GPT.txt", sb2.ToString());
+                File.WriteAllText($"C:\\{Path.GetFileName(openFileDialog.FileName)}_GPT2.txt", sb3.ToString());
             }
         }
 
@@ -2717,37 +2699,37 @@ namespace AquaModelTool
             if (aquaUI.aqua.aquaModels.Count > 0 && openFileDialog.ShowDialog() == DialogResult.OK)
             {
                 AquaUtil aqu = new AquaUtil();
-                Dictionary<string, NGSAquaObject.NGSSHAD> ngsShaders = new Dictionary<string, NGSAquaObject.NGSSHAD>();
+                Dictionary<string, AquaObject.SHAD> ngsShaders = new Dictionary<string, AquaObject.SHAD>();
                 aqu.ReadModel(openFileDialog.FileName);
                 
                 for(int i = 0; i < aqu.aquaModels[0].models[0].shadList.Count; i++)
                 {
                     var shad = aqu.aquaModels[0].models[0].shadList[i];
-                    if (shad is NGSAquaObject.NGSSHAD)
+                    if (shad.isNGS)
                     {
-                        ngsShaders.Add($"{shad.pixelShader.GetString()} {shad.vertexShader.GetString()}", (NGSAquaObject.NGSSHAD)shad);
+                        ngsShaders.Add($"{shad.pixelShader.GetString()} {shad.vertexShader.GetString()}", shad);
                     }
 
-                    foreach(var model in aquaUI.aqua.aquaModels[0].models)
+                }
+                foreach (var model in aquaUI.aqua.aquaModels[0].models)
+                {
+                    for (int s = 0; s < model.shadList.Count; s++)
                     {
-                        for(int s = 0; s < model.shadList.Count; s++)
+                        var curShader = model.shadList[s];
+                        string shadKey = $"{curShader.pixelShader.GetString()} {curShader.vertexShader.GetString()}";
+                        if (ngsShaders.TryGetValue(shadKey, out var value))
                         {
-                            var curShader = model.shadList[s];
-                            string shadKey = $"{curShader.pixelShader} {curShader.vertexShader}";
-                            if(ngsShaders.TryGetValue(shadKey, out var value))
-                            {
-                                NGSAquaObject.NGSSHAD ngsCurShad = ((NGSAquaObject.NGSSHAD)curShader);
-                                ngsCurShad.shadDetail = value.shadDetail;
-                                ngsCurShad.shadDetailOffset = value.shadDetailOffset;
-                                ngsCurShad.shadExtra = value.shadExtra;
-                                ngsCurShad.shadExtraOffset = value.shadExtraOffset;
-                                model.shadList[s] = ngsCurShad;
-                                break;
-                            }
+                            AquaObject.SHAD ngsCurShad = curShader;
+                            ngsCurShad.isNGS = true;
+                            ngsCurShad.shadDetail = value.shadDetail;
+                            ngsCurShad.shadDetailOffset = value.shadDetailOffset;
+                            ngsCurShad.shadExtra = value.shadExtra;
+                            ngsCurShad.shadExtraOffset = value.shadExtraOffset;
+                            model.shadList[s] = ngsCurShad;
                         }
                     }
                 }
-                
+
             }
         }
 
@@ -2884,31 +2866,35 @@ namespace AquaModelTool
             OpenFileDialog openFileDialog = new OpenFileDialog()
             {
                 Title = "Select PSO1 PC n.rel map file",
-                Filter = "PSO1 PC Map|*n.rel"
+                Filter = "PSO1 PC Map|*n.rel",
+                Multiselect = true,
             };
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                bool useSubPath = true;
-                string subPath = "";
-                string fname = openFileDialog.FileName;
-                string outFolder = null;
-                if (useSubPath == true)
+                foreach(var path in openFileDialog.FileNames)
                 {
-                    subPath = Path.GetFileNameWithoutExtension(openFileDialog.FileName) + "\\";
-                    var info = Directory.CreateDirectory(Path.GetDirectoryName(openFileDialog.FileName) + "\\" + subPath);
-                    fname = info.FullName + Path.GetFileName(openFileDialog.FileName);
-                    outFolder = info.FullName;
+                    bool useSubPath = true;
+                    string subPath = "";
+                    string fname = path;
+                    string outFolder = null;
+                    if (useSubPath == true)
+                    {
+                        subPath = Path.GetFileNameWithoutExtension(path) + "\\";
+                        var info = Directory.CreateDirectory(Path.GetDirectoryName(path) + "\\" + subPath);
+                        fname = info.FullName + Path.GetFileName(path);
+                        outFolder = info.FullName;
+                    }
+
+                    var rel = new PSONRelConvert(File.ReadAllBytes(path), path, 0.1f, outFolder);
+                    var aqua = new AquaUtil();
+                    var set = new ModelSet();
+                    set.models.Add(rel.aqObj);
+                    aqua.aquaModels.Add(set);
+                    aqua.ConvertToClassicPSO2Mesh(false, false, false, false, false, false, false);
+
+                    fname = fname.Replace(".rel", ".trp");
+                    aqua.WriteClassicNIFLModel(fname, fname);
                 }
-
-                var rel = new PSONRelConvert(File.ReadAllBytes(openFileDialog.FileName), openFileDialog.FileName, 0.1f, outFolder);
-                var aqua = new AquaUtil();
-                var set = new ModelSet();
-                set.models.Add(rel.aqObj);
-                aqua.aquaModels.Add(set);
-                aqua.ConvertToClassicPSO2Mesh(false, false, false, false, false, false, false);
-
-                fname = fname.Replace(".rel", ".trp");
-                aqua.WriteClassicNIFLModel(fname, fname);
             }
         }
 
@@ -3008,7 +2994,7 @@ namespace AquaModelTool
 
                     foreach (var file in openFileDialog.FileNames)
                     {
-                        ModelImporter.AssimpAQMConvert(file, forceNoCharacterMetadataCheckBox.Checked, true, scaleFactor);
+                        ModelImporter.AssimpAQMConvertAndWrite(file, forceNoCharacterMetadataCheckBox.Checked, true, scaleFactor);
                     }
                 }
             }
@@ -3353,8 +3339,8 @@ namespace AquaModelTool
         {
             OpenFileDialog openFileDialog = new OpenFileDialog()
             {
-                Title = "Select Souls flver file(s)",
-                Filter = "Souls flver Files (*.flver, *.flv)|*.flver;*.flv|All Files (*.*)|*",
+                Title = "Select From Software flver, MDL4 file(s)",
+                Filter = "From Software flver, MDL4 Files (*.flver, *.flv, *.mdl)|*.flver;*.flv;*.mdl|All Files (*.*)|*",
                 Multiselect = true
             };
             if (openFileDialog.ShowDialog() == DialogResult.OK)
@@ -3381,8 +3367,8 @@ namespace AquaModelTool
         {
             OpenFileDialog openFileDialog = new OpenFileDialog()
             {
-                Title = "Select Souls flver file(s)",
-                Filter = "Souls flver Files (*.flver, *.flv)|*.flver;*.flv|All Files (*.*)|*",
+                Title = "Select From Software flver, MDL4 file(s)",
+                Filter = "From Software flver, MDL4 Files (*.flver, *.flv, *.mdl)|*.flver;*.flv;*.mdl|All Files (*.*)|*",
                 Multiselect = true
             };
             if (openFileDialog.ShowDialog() == DialogResult.OK)
@@ -3392,7 +3378,7 @@ namespace AquaModelTool
                 {
                     aquaUI.aqua.aquaModels.Clear();
                     ModelSet set = new ModelSet();
-                    set.models.Add(SoulsConvert.ReadFlver(file, out AquaNode aqn));
+                    set.models.Add(SoulsConvert.ReadFlver(file, out AquaNode aqn, exportWithMetadataToolStripMenuItem.Checked));
                     var outName = Path.ChangeExtension(file, ".aqp");
                     if (set.models[0] != null && set.models[0].vtxlList.Count > 0)
                     {
@@ -3571,17 +3557,407 @@ namespace AquaModelTool
 
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
+                    if(!File.Exists(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "DeSMtdLayoutData.bin")))
+                    {
+                        MessageBox.Show("No DeSMtdLayoutData.bin detected! Please select a PS3 Demon's Souls game folder!");
+                        var browseDialog = new CommonOpenFileDialog()
+                        {
+                            Title = "Open PS3 Demon's Souls root folder",
+                            IsFolderPicker = true,
+                        };
+
+                        if (browseDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                        {
+                            SoulsConvert.GetDeSLayoutMTDInfo(browseDialog.FileName);
+                        } else
+                        {
+                            MessageBox.Show("You MUST have an DeSMtdLayoutData.bin file to proceed!");
+                            return;
+                        }
+                    }
+
                     AquaUtil aqua = new AquaUtil();
-                    ModelSet modelSet = new ModelSet();
-                    modelSet.models.Add(ModelImporter.AssimpAquaConvertFull(openFileDialog.FileName, 1, false, true, out AquaNode aqn));
-                    aqua.aquaModels.Add(modelSet);
                     var ext = Path.GetExtension(openFileDialog.FileName);
                     var outStr = openFileDialog.FileName.Replace(ext, "_out.flver");
-
-                    aqua.aquaModels.Clear();
-                    AquaUIOpenFile(outStr);
+                    SoulsConvert.ConvertModelToFlverAndWrite(openFileDialog.FileName, outStr, 1, true, true, SoulsConvert.SoulsGame.DemonsSouls);
                 }
             }
+        }
+
+        private void parseMSOToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select MySpaceObject",
+                Filter = "MySpaceObject Files (*.mso)|*.mso|All Files (*.*)|*"
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                var mso = AquaUtil.LoadMSO(openFileDialog.FileName);
+                List<string> msoInfo = new List<string>();
+                msoInfo.Add($"MSO Entries ({mso.entryCount}):");
+                msoInfo.Add($"");
+                int i = 0;
+                foreach(var entry in mso.msoEntries)
+                {
+                    msoInfo.Add($"({i}) Name: {entry.asciiName}");
+                    msoInfo.Add($"Descriptor: {entry.utf8Descriptor}");
+                    msoInfo.Add($"Group Name: {entry.groupName}");
+                    msoInfo.Add($"Traits: [{entry.asciiTrait1}], [{entry.asciiTrait2}], [{entry.asciiTrait3}], [{entry.asciiTrait4}], [{entry.asciiTrait5}]");
+                    msoInfo.Add($"");
+                    i++;
+                }
+
+                File.WriteAllLines(openFileDialog.FileName + "_msoInfo.txt", msoInfo);
+            }
+        }
+
+        private void convertDemonsSoulsPS5CmdlToaqpaqnToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select Demon's Souls PS5 cmdl file(s)",
+                Filter = "Demon's Souls PS5 cmsh Files (*.cmsh, *.cmdl)|*.cmsh;*.cmdl|All Files (*.*)|*",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                List<string> failedFiles = new List<string>();
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    aquaUI.aqua.aquaModels.Clear();
+                    ModelSet set = new ModelSet();
+                    set.models.Add(BluePointConvert.ReadCMDL(file, out AquaNode aqn));
+                    var outName = Path.ChangeExtension(file, ".aqp");
+                    if (set.models[0] != null && set.models[0].vtxlList.Count > 0)
+                    {
+                        aquaUI.aqua.aquaModels.Add(set);
+                        aquaUI.aqua.ConvertToNGSPSO2Mesh(false, false, false, true, false, false, false, true);
+                        aquaUI.aqua.WriteNGSNIFLModel(outName, outName);
+                    }
+                    if(aqn != null)
+                    {
+                        AquaUtil.WriteBones(Path.ChangeExtension(outName, ".aqn"), aqn);
+                    }
+                }
+            }
+        }
+
+        private void convertDemonsSoulsPS5CmdlToFbxToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select Demon's Souls PS5 cmdl file(s)",
+                Filter = "Demon's Souls PS5 cmsh Files (*.cmsh, *.cmdl)|*.cmsh;*.cmdl|All Files (*.*)|*",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                List<string> failedFiles = new List<string>();
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    aquaUI.aqua.aquaModels.Clear();
+                    ModelSet set = new ModelSet();
+                    set.models.Add(BluePointConvert.ReadCMDL(file, out AquaNode aqn));
+                    var outName = Path.ChangeExtension(file, ".aqp");
+                    if (set.models[0] != null && set.models[0].vtxlList.Count > 0)
+                    {
+                        aquaUI.aqua.aquaModels.Add(set);
+                        aquaUI.aqua.ConvertToNGSPSO2Mesh(false, false, false, true, false, false, false, true);
+                        set.models[0].ConvertToLegacyTypes();
+                        set.models[0].CreateTrueVertWeights();
+
+                        FbxExporter.ExportToFile(aquaUI.aqua.aquaModels[0].models[0], aqn, new List<AquaMotion>(), Path.ChangeExtension(file, ".fbx"), new List<string>(), false);
+                    }
+                }
+            }
+        }
+
+        private void convertPSUxnjOrModelxnrToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select PSU xnj/model xnr file(s)",
+                Filter = "PSU Model Files (*.xnj, *.xnr)|*.xnj;*.xnr|All Files (*.*)|*",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    aquaUI.aqua.aquaModels.Clear();
+                    ModelSet set = new ModelSet();
+                    NNObject xnj = new NNObject();
+                    xnj.ReadPSUXNJ(file);
+
+                    set.models.Add(xnj.ConvertToBasicAquaobject(out var aqn));
+                    if (set.models[0] != null && set.models[0].tempTris.Count > 0)
+                    {
+                        aquaUI.aqua.aquaModels.Add(set);
+                        aquaUI.aqua.ConvertToNGSPSO2Mesh(false, false, false, true, false, false);
+                        set.models[0].ConvertToLegacyTypes();
+                        set.models[0].CreateTrueVertWeights();
+
+                        var outName = Path.ChangeExtension(file, ".aqp");
+                        aquaUI.aqua.WriteNGSNIFLModel(outName, outName);
+                        AquaUtil.WriteBones(Path.ChangeExtension(outName, ".aqn"), aqn);
+                    }
+                }
+            }
+        }
+
+        private void convertPSUnomTofbxToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select PSU NOM(s)",
+                Filter = "PSU NOM Files (*.nom)|*.nom|All Files (*.*)|*",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                OpenFileDialog openFileDialog2 = new OpenFileDialog()
+                {
+                    Title = "Select PSU .xnj or model .xnr",
+                    Filter = "PSU model Files (*.xnj, *.xnr)|*.xnj;*.xnr|All Files (*.*)|*"
+                };
+                if (openFileDialog2.ShowDialog() == DialogResult.OK)
+                {
+                    ModelSet set = new ModelSet();
+                    NNObject xnj = new NNObject();
+                    xnj.ReadPSUXNJ(openFileDialog2.FileName);
+
+                    if (xnj != null && xnj.vtxlList.Count > 0)
+                    {
+                        set.models.Add(xnj.ConvertToBasicAquaobject(out var bones));
+                        aquaUI.aqua.aquaModels.Clear();
+                        aquaUI.aqua.aquaModels.Add(set);
+                        aquaUI.aqua.ConvertToNGSPSO2Mesh(false, false, false, true, false, false);
+                        aquaUI.aqua.aquaModels[0].models[0].ConvertToLegacyTypes();
+                        aquaUI.aqua.aquaModels[0].models[0].CreateTrueVertWeights();
+
+                        foreach (var file in openFileDialog.FileNames)
+                        {
+                            var nom = new AquaModelLibrary.PSU.NOM(File.ReadAllBytes(file));
+                            List<AquaMotion> aqms = new List<AquaMotion>();
+                            aqms.Add(nom.GetPSO2MotionPSUBody(bones));
+                            FbxExporter.ExportToFile(aquaUI.aqua.aquaModels[0].models[0], bones, aqms, file.Replace(".nom", ".fbx"), new List<string>() { Path.GetFileName(file) }, true);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void convertAnimsTonomToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            using (var ctx = new Assimp.AssimpContext())
+            {
+                var formats = ctx.GetSupportedImportFormats().ToList();
+                formats.Sort();
+
+                OpenFileDialog openFileDialog;
+                openFileDialog = new OpenFileDialog()
+                {
+                    Title = "Convert animation model file(s), fbx recommended (output .aqm(s) will be written to same directory)",
+                    Filter = ""
+                };
+                string tempFilter = "(*.fbx,*.dae,*.glb,*.gltf,*.pmx,*.smd)|*.fbx;*.dae;*.glb;*.gltf;*.pmx;*.smd";
+                string tempFilter2 = "";
+
+                openFileDialog.Filter = tempFilter + tempFilter2;
+
+
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    float scaleFactor = 1;
+
+                    foreach (var file in openFileDialog.FileNames)
+                    {
+                        var animData = ModelImporter.AssimpAQMConvert(file, forceNoCharacterMetadataCheckBox.Checked, true, scaleFactor);
+                        foreach(var anim in animData)
+                        {
+                            var nom = new AquaModelLibrary.PSU.NOM();
+                            nom.CreateFromPSO2Motion(anim.aqm);
+                            
+                            File.WriteAllBytes(Path.ChangeExtension(Path.Combine(file + "_" + anim.fileName), ".nom"), nom.GetBytes());
+                        }
+                    }
+                }
+            }
+        }
+
+        private void convertPSO2PlayeraqmToPSUnomToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select PSO2 Player Animation(s)",
+                Filter = "PSO2 Player Animation (*.aqm)|*.aqm",
+                FileName = "",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                OpenFileDialog openFileDialog2 = new OpenFileDialog()
+                {
+                    Title = "Select PSU .xnj or model .xnr",
+                    Filter = "PSU model Files (*.xnj, *.xnr)|*.xnj;*.xnr|All Files (*.*)|*"
+                };
+                if (openFileDialog2.ShowDialog() == DialogResult.OK)
+                {
+                    OpenFileDialog openFileDialog3 = new OpenFileDialog()
+                    {
+                        Title = "Select PSO2 .aqn",
+                        Filter = "PSO2 aqn Files (*.aqn)|*.aqn|All Files (*.*)|*",
+                        Multiselect = true
+                    };
+                    if (openFileDialog3.ShowDialog() == DialogResult.OK)
+                    {
+                        NNObject xnj = new NNObject();
+                        xnj.ReadPSUXNJ(openFileDialog2.FileName);
+                        if (xnj != null && xnj.vtxlList.Count > 0)
+                        {
+                            xnj.ConvertToBasicAquaobject(out var bones);
+                            var aq = new AquaUtil();
+                            aq.ReadBones(openFileDialog3.FileName);
+                            foreach (var file in openFileDialog.FileNames)
+                            {
+                                aq.aquaMotions.Clear();
+                                aq.ReadMotion(file);
+                                if(aq.aquaMotions[0].anims[0].motionKeys.Count < 50)
+                                {
+                                    continue;
+                                }
+                                var nom = new AquaModelLibrary.PSU.NOM();
+                                nom.CreateFromPSO2BodyMotion(aq.aquaMotions[0].anims[0], bones, aq.aquaBones[0]);
+                                File.WriteAllBytes(Path.ChangeExtension(file, ".nom"), nom.GetBytes());
+                            }
+                        }
+                    }   
+                }
+                        
+            }
+        }
+
+        private void readNNMotionToolStripMenuItem_Click_1(object sender, EventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select NN Animation",
+                Filter = "NN Animation (*.xnm;*.ynm)|*.xnm;*.ynm",
+                FileName = "",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                var aq = new AquaUtil();
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    aq.aquaMotions.Clear();
+                    var nm = new Marathon.Formats.Mesh.Ninja.NinjaMotion();
+                    nm.Read(file);
+                    var nom = new AquaModelLibrary.PSU.NOM();
+                    nom.CreateFromNNMotion(nm);
+                    File.WriteAllBytes(Path.ChangeExtension(file, ".nom"), nom.GetBytes());
+                }
+            }
+        }
+
+        private void parseCAWSToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select CAWS Animation WorkSpace",
+                Filter = "CAWS Animation WorkSpace (*.caws)|*.caws",
+                FileName = "",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    using (MemoryStream ms = new MemoryStream(File.ReadAllBytes(file)))
+                    using (Reloaded.Memory.Streams.BufferedStreamReader sr = new Reloaded.Memory.Streams.BufferedStreamReader(ms, 8192))
+                    {
+                        var caws = new AquaModelLibrary.BluePoint.CAWS.CAWS(sr);
+                    }
+                }
+            }
+        }
+
+        private void spirefierToolStripMenuItem_Click_1(object sender, EventArgs e)
+        {
+            if (aquaUI.aqua.aquaModels.Count == 0)
+            {
+                return;
+            }
+            decimal value = 0;
+
+            if (AquaUICommon.ShowInputDialog(ref value) == DialogResult.OK)
+            {
+                //Spirefier
+                for (int i = 0; i < aquaUI.aqua.aquaModels[0].models.Count; i++)
+                {
+                    var model = aquaUI.aqua.aquaModels[0].models[i];
+                    for (int j = 0; j < model.vtxlList[0].vertPositions.Count; j++)
+                    {
+                        var vec3 = model.vtxlList[0].vertPositions[j];
+                        if (vec3.Y > (float)value)
+                        {
+                            vec3.Y *= 10000;
+                            model.vtxlList[0].vertPositions[j] = vec3;
+                        }
+                    }
+
+                    model.objc.bounds = AquaObjectMethods.GenerateBounding(model.vtxlList);
+                }
+            }
+        }
+
+        private void convertPSO2FileTojsonToolStripMenuItem_Click_1(object sender, EventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select PSO2 File",
+                Filter = "All Files|*.aqp;*.aqo;*.tro;*.trp;*.aqe;*.aqm;*.trm;*.aqn;*trn;*.text;*.bti;*.cmx|PSO2 NIFL Model (*.aqp, *.aqo, *.trp, *.tro)|*.aqp;*.aqo;*.trp;*.tro|" +
+                "PSO2 Aqua Effect (*.aqe)|*.aqe|PSO2 Aqua Motion (*.aqm, *.trm)|*.aqm;*.trm|PSO2 Aqua Node (*.aqn, *.trn)|*.aqn;*.trn|PSO2 Text (*.text)|*.text|Aqua BTI Motion Config (*.bti)|*.bti|PSO2 Character Making Index (*.cmx)|*.cmx",
+                FileName = "",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    AquaUtil aqu = new AquaUtil();
+                    aqu.ConvertToJson(file);
+                }
+            }
+        }
+
+        private void convertPSO2FilejsonToPSO2FileToolStripMenuItem_Click_1(object sender, EventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select PSO2 File",
+                Filter = "All Files|*.aqp.json;*.aqo.json;*.tro.json;*.trp.json;*.aqe.json;*.aqm.json;*.trm.json;*.aqn.json;*trn.json;*.text.json;*.bti.json;*.cmx.json|" +
+                "PSO2 NIFL Model (*.aqp.json, *.aqo.json, *.trp.json, *.tro.json)|*.aqp.json;*.aqo.json;*.trp.json;*.tro.json|" +
+                "PSO2 Aqua Effect (*.aqe.json)|*.aqe.json|PSO2 Aqua Motion (*.aqm.json, *.trm.json)|*.aqm.json;*.trm.json|" +
+                "PSO2 Aqua Node (*.aqn.json, *.trn.json)|*.aqn.json;*.trn.json|PSO2 Text (*.text.json)|*.text.json|Aqua BTI Motion Config (*.bti.json)|*.bti.json|PSO2 Character Making Index (*.cmx.json)|*.cmx.json",
+                FileName = "",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    AquaUtil aqu = new AquaUtil();
+                    aqu.ConvertFromJson(file);
+                }
+            }
+        }
+
+        private void exportWithMetadataToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            exportWithMetadataToolStripMenuItem.Checked = !exportWithMetadataToolStripMenuItem.Checked;
         }
     }
 }

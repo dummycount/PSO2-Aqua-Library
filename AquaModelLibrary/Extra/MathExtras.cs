@@ -5,6 +5,34 @@ namespace AquaModelLibrary.Extra
 {
     public static class MathExtras
     {
+        public static void MirrorX(this Quaternion quat)
+        {
+            quat.Y = -quat.Y;
+            quat.Z = -quat.Z;
+        }
+
+        public static void MirrorY(this Quaternion quat)
+        {
+            quat.X = -quat.X;
+            quat.Z = -quat.Z;
+        }
+        public static void MirrorZ(this Quaternion quat)
+        {
+            quat.X = -quat.X;
+            quat.Y = -quat.Y;
+        }
+
+
+        public static Quaternion ToQuat(this Vector4 vec4)
+        {
+            return new Quaternion(vec4.X, vec4.Y, vec4.Z, vec4.W);
+        }
+
+        public static Vector4 ToVec4(this Quaternion quat)
+        {
+            return new Vector4(quat.X, quat.Y, quat.Z, quat.W);
+        }
+
         public static Quaternion EulerToQuaternion(Vector3 angle)
         {
             return EulerToQuaternion(angle.X, angle.Y, angle.Z);
@@ -15,7 +43,14 @@ namespace AquaModelLibrary.Extra
             y *= (float)(Math.PI / 180);
             z *= (float)(Math.PI / 180);
 
+            var rotation = Matrix4x4.CreateRotationX((float)x) *
+                Matrix4x4.CreateRotationY((float)y) *
+                Matrix4x4.CreateRotationZ((float)z);
+
+            Quaternion q = Quaternion.CreateFromRotationMatrix(rotation);
+            
             // Abbreviations for the various angular functions
+            /*
             double cy = Math.Cos(z * 0.5);
             double sy = Math.Sin(z * 0.5);
             double cp = Math.Cos(y * 0.5);
@@ -28,12 +63,17 @@ namespace AquaModelLibrary.Extra
             q.X = (float)(sr * cp * cy - cr * sp * sy);
             q.Y = (float)(cr * sp * cy + sr * cp * sy);
             q.Z = (float)(cr * cp * sy - sr * sp * cy);
-
+            */
             return q;
         }
 
         //Based on C++ code at https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
         public static Vector3 QuaternionToEuler(Quaternion quat)
+        {
+            return QuaternionToEulerRadians(quat) * (float)(180 / Math.PI);
+        }
+
+        public static Vector3 QuaternionToEulerRadians(Quaternion quat)
         {
             Vector3 angles;
 
@@ -53,8 +93,6 @@ namespace AquaModelLibrary.Extra
             double siny_cosp = 2 * (quat.W * quat.Z + quat.X * quat.Y);
             double cosy_cosp = 1 - 2 * (quat.Y * quat.Y + quat.Z * quat.Z);
             angles.Z = (float)Math.Atan2(siny_cosp, cosy_cosp);
-
-            angles *= (float)(180 / Math.PI);
 
             return angles;
         }

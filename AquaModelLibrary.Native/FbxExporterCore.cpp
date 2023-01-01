@@ -42,7 +42,11 @@ namespace AquaModelLibrary::Objects::Processing::Fbx
         AquaObject::MESH msh = aqo->meshList[meshId];
         AquaObject::VTXL^ vtxl = aqo->vtxlList[msh.vsetIndex];
         String^ meshName;
-        if (includeMetadata)
+        
+        if (aqo->meshNames->Count - 1 >= meshId)
+        {
+            meshName = aqo->meshNames[meshId];
+        } else if (includeMetadata)
         {
             meshName = String::Format("mesh[{4}]_{0}_{1}_{2}_{3}#{5}#{6}", msh.mateIndex, msh.rendIndex, msh.shadIndex, msh.tsetIndex, meshId, msh.baseMeshNodeId, msh.baseMeshDummyId);
         }
@@ -195,7 +199,15 @@ namespace AquaModelLibrary::Objects::Processing::Fbx
             for ( int j = 0; j < bonePalette->Count; j++ )
             {
                 ushort boneIndex = bonePalette[ j ];
-                AquaNode::NODE node = aqn->nodeList[ boneIndex ];
+                AquaNode::NODE node;
+                if (aqn->nodeList->Count > boneIndex)
+                {
+                    node = aqn->nodeList[boneIndex];
+                }
+                else {
+                    node = aqn->nodeList[0];
+                    boneIndex = 0;
+                }
                 FbxNode* lBoneNode = ( FbxNode* ) convertedBones[ boneIndex ].ToPointer();
 
                 IntPtr clusterPtr;
@@ -454,7 +466,7 @@ namespace AquaModelLibrary::Objects::Processing::Fbx
 
         lNode->LclTranslation.Set(FbxVector4(translation.X, translation.Y, translation.Z));
         lNode->LclRotation.Set(eulerAngles);
-        lNode->LclScaling.Set(FbxVector4(scale.X, scale.Y, scale.Z));
+        lNode->LclScaling.Set(FbxVector4(1, 1, 1));
 
         FbxSkeleton* lSkeleton = FbxSkeleton::Create(lScene, name);
         lSkeleton->Color.Set(FbxDouble3(0, 0.769, 0));

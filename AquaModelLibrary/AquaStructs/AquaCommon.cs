@@ -1,4 +1,5 @@
-﻿using Reloaded.Memory.Streams;
+﻿using Newtonsoft.Json;
+using Reloaded.Memory.Streams;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -75,12 +76,17 @@ namespace AquaModelLibrary
 
         public unsafe struct NGSShaderString
         {
+            [JsonIgnore]
             public fixed byte stringArray[0xA];
-
             public string curString
             {
-                get {
+                get
+                {
                     return GetString();
+                }
+                set
+                {
+                    SetString(value);
                 }
             }
 
@@ -159,12 +165,17 @@ namespace AquaModelLibrary
 
         public unsafe struct PSO2String
         {
+            [JsonIgnore]
             public fixed byte stringArray[0x20];
             public string curString
             {
                 get
                 {
                     return GetString();
+                }
+                set
+                {
+                    SetString(value);
                 }
             }
 
@@ -188,11 +199,11 @@ namespace AquaModelLibrary
 
                 return str;
             }
-
+            /*
             public override bool Equals(object o)
             {
                 return Equals((PSO2String)o);
-            }
+            }*/
 
             public bool Equals(PSO2String c)
             {
@@ -309,12 +320,17 @@ namespace AquaModelLibrary
 
         public unsafe struct PSO2Stringx30
         {
+            [JsonIgnore]
             public fixed byte stringArray[0x30];
             public string curString
             {
                 get
                 {
                     return GetString();
+                }
+                set
+                {
+                    SetString(value);
                 }
             }
             

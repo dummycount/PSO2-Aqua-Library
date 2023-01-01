@@ -50,6 +50,10 @@ namespace AquaModelLibrary
         public List<GenericTriangles> tempTris = new List<GenericTriangles>();
         public List<GenericMaterial> tempMats = new List<GenericMaterial>();
 
+        //Extra
+        public List<string> meshNames = new List<string>();
+        public List<string> matUnicodeNames = new List<string>();
+
         //Credit to MiscellaneousModder for this list:
         public enum baseWearIds : int
         {
@@ -272,7 +276,7 @@ namespace AquaModelLibrary
                 return base.GetHashCode();
             }
 
-            public override bool Equals(Object obj)
+            public bool Equiv(Object obj)
             {
                 MATE c = (MATE)obj;
                 // Optimization for a common success case.
@@ -294,7 +298,7 @@ namespace AquaModelLibrary
 
             public static bool operator ==(MATE lhs, MATE rhs)
             {
-                return lhs.Equals(rhs);
+                return lhs.Equiv(rhs);
             }
 
             public static bool operator !=(MATE lhs, MATE rhs) => !(lhs == rhs);
@@ -383,8 +387,10 @@ namespace AquaModelLibrary
         {
         }
 
+        //NGS SHADs are the same as the pso2 equivalent, but the 2 parts at the end are actually used for offsets to 2 new structs
         public class SHAD
         {
+            public bool isNGS = false;
             public int unk0; //0x90, type 0x9 //Always 0?
             public PSO2String pixelShader; //0x91, type 0x2 //Pixel Shader string
             public PSO2String vertexShader; //0x92, type 0x2 //Vertex Shader string
@@ -392,14 +398,20 @@ namespace AquaModelLibrary
             public int shadExtraOffset; //Unused in classic. Not read in some versions of NIFL Tool, causing misalignments. Doesn't exist in VTBF, so perhaps added later on.
                                         //Offset to struct containing extra shader info with areas for some int16s and floats.
 
-            public virtual SHAD Clone()
+            public SHADDetail shadDetail;
+            public List<SHADExtraEntry> shadExtra = new List<SHADExtraEntry>();
+
+            public SHAD Clone()
             {
                 SHAD newShad = new SHAD();
+                newShad.isNGS = isNGS;
                 newShad.unk0 = unk0;
                 newShad.pixelShader = PSO2String.GeneratePSO2String(pixelShader.GetBytes());
                 newShad.vertexShader = PSO2String.GeneratePSO2String(vertexShader.GetBytes());
                 newShad.shadDetailOffset = shadDetailOffset;
                 newShad.shadExtraOffset = shadExtraOffset;
+                newShad.shadDetail = shadDetail;
+                newShad.shadExtra = new List<SHADExtraEntry>(shadExtra);
 
                 return newShad;
             }
@@ -506,10 +518,11 @@ namespace AquaModelLibrary
             public float unkFloat0; //0x6A, type 0xA //0
             public float unkFloat1; //0x6B, type 0xA //0
             public PSO2String texName; //0x6C, type 0x2 //Texture filename (includes extension)
-            public override bool Equals(object obj)
+            
+            /*public override bool Equals(object obj)
             {
                 return Equals((TSTA)obj);
-            }
+            }*/
 
             public bool Equals(TSTA c)
             {
@@ -1408,8 +1421,8 @@ namespace AquaModelLibrary
                         vec4.Z += value;
                         break;
                     case 3:
-                        vec4.W += value;
                         break;
+                        vec4.W += value;
                 }
 
                 return vec4;
@@ -1606,7 +1619,7 @@ namespace AquaModelLibrary
 
             public void toStrips(ushort[] indices)
             {
-                List<ushort> stripList = new List<ushort>();
+                triStrips.Clear();
                 NvStripifier stripifier = new NvStripifier();
 
                 var nvStrips = stripifier.GenerateStripsReturner(indices, true);
@@ -1977,27 +1990,30 @@ namespace AquaModelLibrary
                     {
                         foreach (int meshId in vsetTracker[key])
                         {
-                            Dictionary<int, int> usedVerts = new Dictionary<int, int>();
-                            VSET newVset = new VSET();
-                            VTXL newVtxl = new VTXL();
-
-                            int counter = 0;
-                            for (int stripIndex = 0; stripIndex < strips[meshId].triStrips.Count; stripIndex++)
+                            if(meshList[meshId].vsetIndex >= 0 && meshList[meshId].psetIndex >= 0)
                             {
-                                ushort id = strips[meshId].triStrips[stripIndex];
-                                if (!usedVerts.ContainsKey(id))
+                                Dictionary<int, int> usedVerts = new Dictionary<int, int>();
+                                VSET newVset = new VSET();
+                                VTXL newVtxl = new VTXL();
+
+                                int counter = 0;
+                                for (int stripIndex = 0; stripIndex < strips[meshId].triStrips.Count; stripIndex++)
                                 {
-                                    AquaObjectMethods.appendVertex(vtxlList[meshList[meshId].vsetIndex], newVtxl, id);
-                                    usedVerts.Add(id, counter);
-                                    counter++;
+                                    ushort id = strips[meshId].triStrips[stripIndex];
+                                    if (!usedVerts.ContainsKey(id))
+                                    {
+                                        AquaObjectMethods.appendVertex(vtxlList[meshList[meshId].vsetIndex], newVtxl, id);
+                                        usedVerts.Add(id, counter);
+                                        counter++;
+                                    }
+                                    strips[meshId].triStrips[stripIndex] = (ushort)usedVerts[id];
                                 }
-                                strips[meshId].triStrips[stripIndex] = (ushort)usedVerts[id];
-                            }
-                            var tempMesh = meshList[meshId];
-                            tempMesh.vsetIndex = meshId;
-                            meshList[meshId] = tempMesh;
-                            newVsetArray[meshId] = newVset;
-                            newVtxlArray[meshId] = newVtxl;
+                                var tempMesh = meshList[meshId];
+                                tempMesh.vsetIndex = meshId;
+                                meshList[meshId] = tempMesh;
+                                newVsetArray[meshId] = newVset;
+                                newVtxlArray[meshId] = newVtxl;
+                            } 
                         }
                     }
                     else
@@ -2013,6 +2029,23 @@ namespace AquaModelLibrary
                 vsetList = newVsetArray.ToList();
                 vtxlList = newVtxlArray.ToList();
             }
+
+            List<int> badIds = new List<int>();
+            for(int i = 0; i < meshList.Count; i++)
+            {
+                if (meshList[i].vsetIndex < 0 || meshList[i].psetIndex < 0)
+                {
+                    badIds.Add(i);
+                }
+            }
+
+            int badCounter = 0;
+            foreach(var id in badIds)
+            {
+                meshList.RemoveAt(id - badCounter);
+                badCounter++;
+            }
+            objc.meshCount = meshList.Count;
             objc.vsetCount = vsetList.Count;
 
             return vsetList.Count;
@@ -2076,7 +2109,13 @@ namespace AquaModelLibrary
                     mat.shaderNames = shadNames;
                     mat.blendType = curMate.alphaType.GetString();
                     mat.specialType = AquaObjectMethods.GetSpecialMatType(texNames);
-                    mat.matName = curMate.matName.GetString();
+                    if (matUnicodeNames.Count > curMesh.mateIndex)
+                    {
+                        mat.matName = matUnicodeNames[curMesh.mateIndex];
+                    } else
+                    {
+                        mat.matName = curMate.matName.GetString();
+                    }
                     mat.twoSided = curRend.twosided;
                     mat.alphaCutoff = curRend.alphaCutoff;
 

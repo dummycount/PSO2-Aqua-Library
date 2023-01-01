@@ -164,6 +164,13 @@ namespace AquaModelLibrary
                 {
                     var categoryIndexOffset = streamReader.Read<int>();
                     var subCategoryId = streamReader.Read<int>();
+
+                    //Thanks, SEA servers...
+                    while (subCategoryId >= txt.text[i].Count)
+                    {
+                        txt.text[i].Add(new List<PSO2Text.textPair>());
+                    }
+
                     var categoryIndexCount = streamReader.Read<int>();
                     var bookMarkSub = streamReader.Position();
 
@@ -951,7 +958,6 @@ namespace AquaModelLibrary
                     case "DOC ":
                         break;
                     case "MAGR":
-                        Debug.WriteLine((int)data[0][0xFF]);
                         mgxIds.Add((int)data[0][0xFF]);
                         break;
                     default:

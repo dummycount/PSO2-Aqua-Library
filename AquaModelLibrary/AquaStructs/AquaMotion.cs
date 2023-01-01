@@ -192,10 +192,7 @@ namespace AquaModelLibrary
                 highTime /= 0x10;
                 lowTime /= 0x10;
                 double ratio = (time - lowTime) / (highTime - lowTime);
-                if(double.IsInfinity(ratio) || double.IsNaN(ratio) || ratio < 0 || ratio == 0)
-                {
-                    var a = 0;
-                }
+
                 return Vector4.Lerp(lowValue, highValue, (float)ratio);
             }
 
@@ -386,13 +383,16 @@ namespace AquaModelLibrary
                         mode = 1;
                     }
 
-                    //Get rid of parental influence
-                    for (int t = 0; t < nodeScale.frameTimings.Count; t++)
+                    if(nodeScale != null)
                     {
-                        var currentTime = nodeScale.frameTimings[t];
-                        var value = parentNodeScale.GetLinearInterpolatedVec4Key(currentTime);
+                        //Get rid of parental influence
+                        for (int t = 0; t < nodeScale.frameTimings.Count; t++)
+                        {
+                            var currentTime = nodeScale.frameTimings[t];
+                            var value = parentNodeScale.GetLinearInterpolatedVec4Key(currentTime);
 
-                        nodeScale.RemoveParentScaleInfluenceAtTime(nodeScale.frameTimings[t], mode, value);
+                            nodeScale.RemoveParentScaleInfluenceAtTime(nodeScale.frameTimings[t], mode, value);
+                        }
                     }
                 }
             }

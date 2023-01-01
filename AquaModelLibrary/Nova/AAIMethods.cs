@@ -2,6 +2,7 @@
 using Reloaded.Memory.Streams;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -38,7 +39,7 @@ namespace AquaModelLibrary.Nova
                 ushort sht_0C = streamReader.Read<ushort>();
                 int timeCount = streamReader.Read<int>();
 
-                int finalFrame = streamReader.Read<int>();
+                float finalFrame = streamReader.Read<float>();
                 int unkAddress0 = streamReader.Read<int>();
                 int unkAddress1 = streamReader.Read<int>();
                 int unkAddress2 = streamReader.Read<int>();
@@ -81,25 +82,25 @@ namespace AquaModelLibrary.Nova
                         {
                             case 0x14:
                                 ct14++;
-                                dc.d14 = streamReader.Read<DataClump14>();
+                                dc.dc = streamReader.Read<DataClump14>();
                                 break;
-                            case 0x24:
+                            case 0x24: //Should be for typical keyframe types
                                 ct24++;
-                                dc.d24 = streamReader.Read<DataClump24>();
+                                dc.dc = streamReader.Read<DataClump24>();
                                 break;
                             case 0x30:
                                 ct30++;
-                                dc.d30 = streamReader.Read<DataClump30>();
+                                dc.dc = streamReader.Read<DataClump30>();
                                 break;
                             case 0x34:
                                 ct34++;
-                                dc.d34 = streamReader.Read<DataClump34>();
-                                dc.dcString = dc.d34.clumpName.GetString();
+                                dc.dc = streamReader.Read<DataClump34>();
+                                dc.dcString = ((DataClump34)dc.dc).clumpName.GetString();
                                 break;
                             case 0x44:
                                 ct44++;
-                                dc.d44 = streamReader.Read<DataClump44>();
-                                dc.dcString = dc.d44.clumpName.GetString();
+                                dc.dc = streamReader.Read<DataClump44>();
+                                dc.dcString = ((DataClump44)dc.dc).clumpName.GetString();
                                 break;
                             default:
                                 MessageBox.Show($"clumpSize {dc.dcStart.dcType.ToString("X")} at {streamReader.Position().ToString("X")} is unexpected!");
@@ -112,36 +113,56 @@ namespace AquaModelLibrary.Nova
 
                 //return null;
 
-                var offsetTimes = streamReader.ReadOffsetTimeSets(streamReader.Position(), timeCount);
-                List<List<OffsetTimeSet>> setsList = new List<List<OffsetTimeSet>>();
-
+                var offsetTimesStart = streamReader.Position();
+                var offsetTimes = streamReader.ReadOffsetTimeSets(timeCount);
+                List<List<NodeOffsetSet>> setsList = new List<List<NodeOffsetSet>>();
+                List<Dictionary<int, RotationKey>> framesDictList = new List<Dictionary<int, RotationKey>>();
+                
                 for (int i = 0; i < offsetTimes.Count; i++)
                 {
-                    streamReader.Seek(offsetTimes[i].offset, SeekOrigin.Begin);
+                    streamReader.Seek(offsetTimes[i].offset + offsetTimesStart + i * 8, SeekOrigin.Begin);
                     var position = streamReader.Position();
+                    Debug.WriteLine($"OffsetTime {i} start: {position:X}");
                     int keyNodeCount = streamReader.Read<int>();
-
-                    List<OffsetTimeSet> sets = new List<OffsetTimeSet>();
-                    for(int j = 0; j < keyNodeCount; j++)
+                    
+                    //Sometimes, they just put the keydata right here? Read the keydata when this is figured out
+                    if(keyNodeCount > 0xFF)
                     {
-                        OffsetTimeSet set = streamReader.Read<OffsetTimeSet>();
+                        throw new Exception();
+                    }
+
+                    List<NodeOffsetSet> sets = new List<NodeOffsetSet>();
+                    for (int j = 0; j < keyNodeCount; j++)
+                    {
+                        NodeOffsetSet set = streamReader.Read<NodeOffsetSet>();
                         sets.Add(set);
                     }
                     setsList.Add(sets);
+
+                    for(int j = 0; j < sets.Count; j++)
+                    {
+                        
+                    }
                 }
             }
             return null;
         }
 
-        public static List<OffsetTimeSet> ReadOffsetTimeSets(this BufferedStreamReader streamReader, long position, int timeCount)
+        public static List<OffsetTimeSet> ReadOffsetTimeSets(this BufferedStreamReader streamReader, int timeCount)
         {
             List<OffsetTimeSet> sets = new List<OffsetTimeSet>();
             OffsetTimeSet set0 = new OffsetTimeSet() { offset = streamReader.Read<int>(), time = streamReader.Read<float>() };
-            
-            for(int i = 0; i < timeCount; i++)
+
+            //Note a potentially unintended read
+            if(timeCount == 0)
             {
-                //Add i * 8 to the offset for the true offset since the offsets here are relatigve to the position of their defining int
-                OffsetTimeSet set = new OffsetTimeSet() { offset = (int)position + streamReader.Read<int>() + i * 8, time = streamReader.Read<float>() };
+                Debug.WriteLine($"Warning, timeCount is {timeCount}, set0 values are offset:{set0.offset:X} time:{set0.time}");
+            }
+            sets.Add(set0);
+
+            for (int i = 0; i < timeCount - 1; i++) //Already Reading one in before this
+            {
+                OffsetTimeSet set = new OffsetTimeSet() { offset = streamReader.Read<int>(), time = streamReader.Read<float>() };
                 sets.Add(set);
             }
 
