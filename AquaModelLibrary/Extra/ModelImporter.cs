@@ -701,7 +701,7 @@ namespace AquaModelLibrary
         }
 
         //Takes in an Assimp model and generates a full PSO2 model and skeleton from it.
-        public static AquaObject AssimpAquaConvertFull(string initialFilePath, float scaleFactor, bool preAssignNodeIds, bool isNGS, out AquaNode aqn)
+        public static AquaObject AssimpAquaConvertFull(string initialFilePath, float scaleFactor, bool preAssignNodeIds, bool isNGS, out AquaNode aqn, bool condenseMaterials = true)
         {
             AquaUtil aquaUtil = new AquaUtil();
             Assimp.AssimpContext context = new Assimp.AssimpContext();
@@ -766,7 +766,7 @@ namespace AquaModelLibrary
                 }
                 else if (aiMat.TextureDiffuse.FilePath != null)
                 {
-                    genMat.texNames.Add(Path.GetFileName(aiMat.TextureDiffuse.FilePath));
+                    genMat.texNames.Add(Path.GetFileName(NixIllegalCharacters(aiMat.TextureDiffuse.FilePath)));
                 }
                 else
                 {
@@ -795,7 +795,7 @@ namespace AquaModelLibrary
             AquaUtilData.ModelSet set = new AquaUtilData.ModelSet();
             set.models.Add(aqp);
             aquaUtil.aquaModels.Add(set);
-            aquaUtil.ConvertToNGSPSO2Mesh(false, false, false, true, false, false, true);
+            aquaUtil.ConvertToNGSPSO2Mesh(false, false, false, true, false, false, true, false, condenseMaterials);
 
             //AQPs created this way will require more processing to finish.
             //-Texture lists in particular, MUST be generated as what exists is not valid without serious errors
@@ -915,14 +915,15 @@ namespace AquaModelLibrary
                 //Assign transform data
                 Matrix4x4 worldMat;
                 var localMat = SwapRow4Column4Mat4(GetMat4FromAssimpMat4(aiNode.Transform));
+                Matrix4x4.Decompose(localMat, out var scale, out var rot, out var pos);
+                
                 worldMat = localMat;
+
                 if (node.parentId != -1)
                 {
-                    //Matrix4x4.Invert(aqn.nodeList[node.parentId].GetInverseBindPoseMatrix(), out var parMatrix);
-                    //worldMat *= parMatrix;
                     worldMat = GetWorldTransform(aiNode);
                 }
-                worldMat = SetMatrixScale1(worldMat);
+                worldMat = SetMatrixScale(worldMat);
                 Matrix4x4.Invert(worldMat, out var worldMatInv);
                 node.m1 = new Vector4(worldMatInv.M11, worldMatInv.M12, worldMatInv.M13, worldMatInv.M14);
                 node.m2 = new Vector4(worldMatInv.M21, worldMatInv.M22, worldMatInv.M23, worldMatInv.M24);
@@ -986,18 +987,6 @@ namespace AquaModelLibrary
             {
                 IterateAiNodesAQP(aqp, aqn, aiScene, childNode, nodeMat, baseScale, boneDict);
             }
-        }
-
-        //There's probably a better way to do this, but I am no math king
-        private static Matrix4x4 SetMatrixScale1(Matrix4x4 worldMat)
-        {
-            Matrix4x4 mat;
-            Matrix4x4.Decompose(worldMat, out var scaleMat, out var rotMat, out var posMat);
-            mat = Matrix4x4.Identity;
-            mat *= Matrix4x4.CreateScale(new Vector3(1, 1, 1));
-            mat *= Matrix4x4.CreateFromQuaternion(rotMat);
-            mat *= Matrix4x4.CreateTranslation(posMat);
-            return mat;
         }
 
         public static void AddAiMeshToAQP(AquaObject aqp, Assimp.Mesh mesh, Matrix4x4 nodeMat, float baseScale, Dictionary<string, int> boneDict)
@@ -1131,7 +1120,11 @@ namespace AquaModelLibrary
             {
                 return new List<int>();
             }
-            if (name.Substring(name.Length - 5, 5) == "_mesh")
+            if (name[name.Length - 4] == '.')
+            {
+                name = name.Substring(0, name.Length - 4);
+            }
+            if (name.Length > 5 && name.Substring(name.Length - 5, 5) == "_mesh")
             {
                 name = name.Substring(0, name.Length - 5);
             }

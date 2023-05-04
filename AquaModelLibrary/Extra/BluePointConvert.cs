@@ -1,21 +1,33 @@
-﻿using AquaModelLibrary.BluePoint.CMSH;
+﻿using AquaModelLibrary.BluePoint.CANI;
 using AquaModelLibrary.BluePoint.CMAT;
+using AquaModelLibrary.BluePoint.CMSH;
 using AquaModelLibrary.BluePoint.CSKL;
 using Reloaded.Memory.Streams;
-using System;
 using System.Collections.Generic;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
+using System.Runtime.Remoting.Messaging;
 using static AquaModelLibrary.AquaNode;
-using System.Diagnostics;
 
 namespace AquaModelLibrary.Extra
 {
     public class BluePointConvert
     {
+        public static void ReadFileTest(string filePath, out int start, out int typeFlags, out int modelType)
+        {
+            using (Stream stream = new MemoryStream(File.ReadAllBytes(filePath)))
+            using (var streamReader = new BufferedStreamReader(stream, 8192))
+            {
+                start = streamReader.Read<ushort>();
+                streamReader.Seek(0x5, SeekOrigin.Begin);
+                typeFlags = streamReader.Read<byte>();
+                streamReader.Seek(0x9, SeekOrigin.Begin);
+                modelType = streamReader.Read<byte>();
+            }
+        }
+
         public static AquaObject ReadCMDL(string filePath, out AquaNode aqn)
         {
             string cmshPath = Path.ChangeExtension(filePath, ".cmsh");
@@ -28,16 +40,25 @@ namespace AquaModelLibrary.Extra
             }
         }
 
+        public static CANI ReadCANI(string filePath)
+        {
+            using (Stream stream = new MemoryStream(File.ReadAllBytes(filePath)))
+            using (var streamReader = new BufferedStreamReader(stream, 8192))
+            {
+                return new CANI(streamReader);
+            }
+        }
+
         public static AquaObject CMDLToAqua(CMSH mdl, string cmtlPath, string modelPath, out AquaNode aqn)
         {
-            if(mdl.header.variantFlag2 == 0x41)
+            if (mdl.header.variantFlag2 == 0x41)
             {
                 aqn = null;
                 return null;
             }
             var csklPath = "";
             CSKL cskl = null;
-            if (mdl.boneData != null)
+            if (mdl.boneData != null && mdl.boneData.skeletonPath != null)
             {
                 csklPath = Path.Combine(modelPath, Path.GetFileName(mdl.boneData.skeletonPath));
                 if (File.Exists(csklPath))
@@ -47,7 +68,8 @@ namespace AquaModelLibrary.Extra
                     {
                         cskl = new CSKL(streamReader);
                     }
-                } else
+                }
+                else
                 {
                     if (modelPath.Contains("-app0"))
                     {
@@ -58,7 +80,7 @@ namespace AquaModelLibrary.Extra
                             currentPath = Path.GetDirectoryName(currentPath);
                             i++;
                             //Should seriously never ever ever happen, but screw it
-                            if(i == 255)
+                            if (i == 255)
                             {
                                 break;
                             }
@@ -73,26 +95,44 @@ namespace AquaModelLibrary.Extra
                     }
                 }
             }
-           
-            var mirrorMat = Matrix4x4.Identity;
-            /*var mirrorMat = new Matrix4x4(-1, 0, 0, 0,
-                                        0, 1, 0, 0,
-                                        0, 0, 1, 0,
-                                        0, 0, 0, 1);
-            */
 
             aqn = AquaNode.GenerateBasicAQN();
             AquaObject aqp = new NGSAquaObject();
             if (cskl == null && mdl.boneData == null)
             {
                 aqp.bonePalette.Add((uint)0);
-            } else if (cskl == null && mdl.boneData != null)
+            }
+            else if (cskl == null && mdl.boneData != null)
             {
+                aqn.nodeList.Clear();
                 for (int i = 0; i < mdl.boneData.nameCount; i++)
                 {
                     aqp.bonePalette.Add((uint)i);
+
+                    //Try to make a skeleton from incomplete bone data. All we really get is a vector4 that seems like it *might* be a rotation? Can't do too much with this, but we'll put it in.
+                    NODE aqNode = new NODE();
+                    aqNode.boneShort1 = 0x1C0;
+                    aqNode.animatedFlag = 1;
+                    aqNode.parentId = i - 1;
+                    aqNode.unkNode = -1;
+
+                    var quat = mdl.boneData.boneVec4Array[i].ToQuat();
+                    aqNode.eulRot = MathExtras.QuaternionToEuler(quat);
+                    aqNode.scale = new Vector3(1, 1, 1);
+                   
+                    var matrix = Matrix4x4.Identity;
+                    matrix *= Matrix4x4.CreateScale(1, 1, 1);
+                    var rotation = Matrix4x4.CreateFromQuaternion(quat);
+                    matrix *= rotation;
+                    matrix *= Matrix4x4.CreateTranslation(new Vector3());
+                    Matrix4x4.Invert(matrix, out var invMat);
+
+                    aqNode.SetInverseBindPoseMatrix(invMat);
+                    aqNode.boneName.SetString(mdl.boneData.boneNames[i]);
+                    aqn.nodeList.Add(aqNode);
                 }
-            } else
+            }
+            else
             {
                 for (int i = 0; i < cskl.header.boneCount; i++)
                 {
@@ -139,6 +179,8 @@ namespace AquaModelLibrary.Extra
                     aqNode.parentId = parentId;
                     aqNode.unkNode = -1;
 
+                    aqNode.pos = translation;
+                    aqNode.eulRot = MathExtras.QuaternionToEuler(quatRot);
                     aqNode.scale = new Vector3(1, 1, 1);
 
                     Matrix4x4.Invert(mat, out var invMat);
@@ -149,21 +191,6 @@ namespace AquaModelLibrary.Extra
                     aqNode.boneName.SetString(cskl.names.primaryNames.names[i].Split('|').Last());
                     //Debug.WriteLine($"{i} " + aqNode.boneName.GetString());
                     aqn.nodeList.Add(aqNode);
-                }
-
-                //I 100% believe there's a better way to do this when constructing the matrix, but for now we do this.
-                for (int i = 0; i < aqn.nodeList.Count; i++)
-                {
-                    var bone = aqn.nodeList[i];
-                    Matrix4x4.Invert(bone.GetInverseBindPoseMatrix(), out var mat);
-                    mat *= mirrorMat;
-                    Matrix4x4.Decompose(mat, out var scale, out var rot, out var translation);
-                    bone.pos = translation;
-                    bone.eulRot = MathExtras.QuaternionToEuler(rot);
-
-                    Matrix4x4.Invert(mat, out var invMat);
-                    bone.SetInverseBindPoseMatrix(invMat);
-                    aqn.nodeList[i] = bone;
                 }
             }
 
@@ -177,7 +204,7 @@ namespace AquaModelLibrary.Extra
 
             for (int v = 0; v < vertCount; v++)
             {
-                vtxl.vertPositions.Add(Vector3.Transform(mesh.vertData.positionList[v], mirrorMat));
+                vtxl.vertPositions.Add(mesh.vertData.positionList[v]);
                 //vtxl.vertNormals.Add(Vector3.Transform(mesh.vertData.normals[v], mirrorMat));
                 //var quat = mesh.vertData.normals[v];
 
@@ -229,15 +256,49 @@ namespace AquaModelLibrary.Extra
             aqp.vtxeList.Add(AquaObjectMethods.ConstructClassicVTXE(vtxl, out int vc));
 
             //Face data
+
+            //Do by vertex order if there's no faces
+            if(mesh.faceData.faceList.Count == 0)
+            {
+                int faceCount = mesh.vertData.positionList.Count;
+                for (int i = 0; i < faceCount; i += 3)
+                {
+                    mesh.faceData.faceList.Add(Vector3Integer.Vector3Int.Vec3Int.CreateVec3Int(i, i + 1, i + 2));
+                }
+
+                //Assume mat face stuff is bad
+                mesh.header.matList[0].startingFaceIndex = 0; 
+                mesh.header.matList[0].startingFaceVertIndex = 0;
+                mesh.header.matList[0].endingFaceIndex = mesh.faceData.faceList.Count * 6;
+                mesh.header.matList[0].faceVertIndicesUsed = mesh.faceData.faceList.Count * 3;
+
+                for(int i = 1; i < mesh.header.matList.Count; i++)
+                {
+                    mesh.header.matList[i].startingFaceIndex = 0;
+                    mesh.header.matList[i].startingFaceVertIndex = 0;
+                    mesh.header.matList[i].endingFaceIndex = 0;
+                    mesh.header.matList[i].faceVertIndicesUsed = 0;
+                }
+            }
+
             //Split CMSH by materials. Materials seem to contain a face count after which they split
             int currentFace = 0;
             for (int m = 0; m < mesh.header.matList.Count; m++)
             {
-                var startFace = mesh.header.matList[m].startingFaceIndex / 6;
-                var faceCount = mesh.header.matList[m].endingFaceIndex / 6;
-                
+                int startFace;
+                int faceCount;
+                if (mesh.header.hasExtraFlags)
+                {
+                    startFace = mesh.header.matList[m].startingFaceIndex / 6;
+                    faceCount = mesh.header.matList[m].endingFaceIndex / 6;
+                } else //SOTC
+                {
+                    startFace = mesh.header.matList[m].startingFaceVertIndex / 3;
+                    faceCount = mesh.header.matList[m].faceVertIndicesUsed / 3;
+                }
+
                 //Sometimes BluePoint's optimization led to degenerate faces, so we skip
-                if(faceCount == 0 && mesh.header.matList[m].endingFaceIndex > 1)
+                if (faceCount == 0 && mesh.header.matList[m].endingFaceIndex > 1)
                 {
                     continue;
                 }
@@ -253,12 +314,13 @@ namespace AquaModelLibrary.Extra
                     using (var streamReader = new BufferedStreamReader(stream, 8192))
                     {
                         var cmat = new CMAT(streamReader);
-                        if(cmat.texNames.Count > 0)
+                        if (cmat.texNames.Count > 0)
                         {
                             texName = cmat.texNames[0];
                         }
                     }
-                } else if(File.Exists(backupMatPath))
+                }
+                else if (File.Exists(backupMatPath))
                 {
                     using (Stream stream = new MemoryStream(File.ReadAllBytes(backupMatPath)))
                     using (var streamReader = new BufferedStreamReader(stream, 8192))
@@ -297,10 +359,11 @@ namespace AquaModelLibrary.Extra
                     int x;
                     int y;
                     int z;
-                    if(vertIdDict.TryGetValue(tri.X, out var value))
+                    if (vertIdDict.TryGetValue(tri.X, out var value))
                     {
                         x = value;
-                    } else
+                    }
+                    else
                     {
                         vertIdDict.Add(tri.X, matVtxl.vertPositions.Count);
                         x = matVtxl.vertPositions.Count;
@@ -327,6 +390,11 @@ namespace AquaModelLibrary.Extra
                         AquaObjectMethods.appendVertex(vtxl, matVtxl, tri.Z);
                     }
 
+                    //Avoid degen tris
+                    if (x == y || x == z || y == z)
+                    {
+                        continue;
+                    }
                     triList.Add(new Vector3(x, y, z));
                 }
                 genMesh.triList = triList;
@@ -339,8 +407,11 @@ namespace AquaModelLibrary.Extra
                     genMesh.matIdList[j] = aqp.tempMats.Count - 1;
                 }
 
-                aqp.tempTris.Add(genMesh);
-                aqp.vtxlList.Add(matVtxl);
+                if(genMesh.vertCount > 0)
+                {
+                    aqp.tempTris.Add(genMesh);
+                    aqp.vtxlList.Add(matVtxl);
+                }
             }
 
 

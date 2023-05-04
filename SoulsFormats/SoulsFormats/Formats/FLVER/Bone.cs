@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System;
+using System.Numerics;
 
 namespace SoulsFormats
 {
@@ -9,15 +10,6 @@ namespace SoulsFormats
         /// </summary>
         public class Bone
         {
-            public enum RotationOrder
-            {
-                XYZ,
-                XZY,
-                YXZ,
-                YZX,
-                ZXY,
-                ZYX
-            }
             /// <summary>
             /// Corresponds to the name of a bone in the parent skeleton, if present.
             /// </summary>
@@ -89,44 +81,12 @@ namespace SoulsFormats
             /// <summary>
             /// Creates a transformation matrix from the scale, rotation, and translation of the bone.
             /// </summary>
-            public Matrix4x4 ComputeLocalTransform(RotationOrder order = RotationOrder.XZY)
+            public Matrix4x4 ComputeLocalTransform()
             {
                 var mat = Matrix4x4.CreateScale(Scale);
-
-                switch(order)
-                {
-                    case RotationOrder.XYZ:
-                        mat *= Matrix4x4.CreateRotationX(Rotation.X);
-                        mat *= Matrix4x4.CreateRotationY(Rotation.Y);
-                        mat *= Matrix4x4.CreateRotationZ(Rotation.Z);
-                        break;
-                    case RotationOrder.XZY:
-                        mat *= Matrix4x4.CreateRotationX(Rotation.X);
-                        mat *= Matrix4x4.CreateRotationZ(Rotation.Z);
-                        mat *= Matrix4x4.CreateRotationY(Rotation.Y);
-                        break;
-                    case RotationOrder.YXZ:
-                        mat *= Matrix4x4.CreateRotationY(Rotation.Y);
-                        mat *= Matrix4x4.CreateRotationX(Rotation.X);
-                        mat *= Matrix4x4.CreateRotationZ(Rotation.Z);
-                        break;
-                    case RotationOrder.YZX:
-                        mat *= Matrix4x4.CreateRotationY(Rotation.Y);
-                        mat *= Matrix4x4.CreateRotationZ(Rotation.Z);
-                        mat *= Matrix4x4.CreateRotationX(Rotation.X);
-                        break;
-                    case RotationOrder.ZXY:
-                        mat *= Matrix4x4.CreateRotationZ(Rotation.Z);
-                        mat *= Matrix4x4.CreateRotationX(Rotation.X);
-                        mat *= Matrix4x4.CreateRotationY(Rotation.Y);
-                        break;
-                    case RotationOrder.ZYX:
-                        mat *= Matrix4x4.CreateRotationZ(Rotation.Z);
-                        mat *= Matrix4x4.CreateRotationY(Rotation.Y);
-                        mat *= Matrix4x4.CreateRotationX(Rotation.X);
-                        break;
-                }
-
+                mat *= Matrix4x4.CreateRotationX(Rotation.X);
+                mat *= Matrix4x4.CreateRotationZ(Rotation.Z);
+                mat *= Matrix4x4.CreateRotationY(Rotation.Y);
                 mat *= Matrix4x4.CreateTranslation(Translation);
 
                 return mat;

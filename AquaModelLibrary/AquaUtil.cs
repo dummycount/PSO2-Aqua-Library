@@ -213,7 +213,7 @@ namespace AquaModelLibrary
 
         //Temp material, vtxlList data or tempTri vertex data, and temptris are expected to be populated prior to this process. This should ALWAYS be run before any write attempts.
         //High count faces is a hack for data storage. NGS at this time does NOT support face counts greater than 65536!
-        public void ConvertToNGSPSO2Mesh(bool useUnrms, bool useFaceNormals, bool baHack, bool useBiTangent, bool zeroBounds, bool useRigid, bool splitVerts = true, bool useHighCountFaces = false)
+        public void ConvertToNGSPSO2Mesh(bool useUnrms, bool useFaceNormals, bool baHack, bool useBiTangent, bool zeroBounds, bool useRigid, bool splitVerts = true, bool useHighCountFaces = false, bool condenseMaterials = true)
         {
             for (int msI = 0; msI < aquaModels.Count; msI++)
             {
@@ -266,9 +266,10 @@ namespace AquaModelLibrary
                     {
                         matModelSplit.vtxlList = aquaModels[msI].models[aqI].vtxlList;
                         matModelSplit.tempTris = aquaModels[msI].models[aqI].tempTris;
+                        matModelSplit.meshNames = aquaModels[msI].models[aqI].meshNames;
                     } else
                     {
-                        SplitMeshByMaterial(aquaModels[msI].models[aqI], matModelSplit);
+                        SplitMeshByMaterialTempData(aquaModels[msI].models[aqI], matModelSplit);
                     }
                     outModel = matModelSplit;
                     if (useRigid == false)
@@ -298,7 +299,6 @@ namespace AquaModelLibrary
                         outModel.rendList = aquaModels[msI].models[aqI].rendList;
                         outModel.texfList = aquaModels[msI].models[aqI].texfList;
                         outModel.tstaList = aquaModels[msI].models[aqI].tstaList;
-
                     }
                     else
                     {
@@ -309,33 +309,34 @@ namespace AquaModelLibrary
                     }
 
                     //Find and condense materials with same name. These would have been split due to render/shader differences
-                    Dictionary<string, List<int>> matDict = new Dictionary<string, List<int>>();
-                    Dictionary<int, int> newMatReferences = new Dictionary<int, int>();
                     List<AquaObject.MATE> newMateList = new List<AquaObject.MATE>();
-                    var oldMatArr = outModel.mateList.ToArray();
-                    for (int mat = 0; mat < outModel.mateList.Count; mat++)
+                    Dictionary<int, int> newMatReferences = new Dictionary<int, int>();
+                    if (condenseMaterials)
                     {
-                        var matName = outModel.mateList[mat].matName.GetString();
-                        if (matDict.ContainsKey(matName))
+                        Dictionary<string, List<int>> matDict = new Dictionary<string, List<int>>();
+                        var oldMatArr = outModel.mateList.ToArray();
+                        for (int mat = 0; mat < outModel.mateList.Count; mat++)
                         {
-                            matDict[matName].Add(mat);
+                            var matName = outModel.mateList[mat].matName.GetString();
+                            if (matDict.ContainsKey(matName))
+                            {
+                                matDict[matName].Add(mat);
+                            }
+                            else
+                            {
+                                matDict.Add(matName, new List<int>() { mat });
+                            }
                         }
-                        else
+                        foreach (var pair in matDict)
                         {
-                            matDict.Add(matName, new List<int>() { mat });
+                            newMateList.Add(oldMatArr[pair.Value[0]]);
+                            foreach (var val in pair.Value)
+                            {
+                                newMatReferences.Add(val, newMateList.Count - 1);
+                            }
                         }
+                        outModel.mateList = newMateList;
                     }
-                    foreach (var pair in matDict)
-                    {
-                        newMateList.Add(oldMatArr[pair.Value[0]]);
-                        foreach (var val in pair.Value)
-                        {
-                            newMatReferences.Add(val, newMateList.Count - 1);
-                        }
-                    }
-                    outModel.mateList = newMateList;
-
-                    //outModel = matModelSplit;
 
                     //Set up PSETs and strips, and other per mesh data
                     for (int i = 0; i < outModel.tempTris.Count; i++)
@@ -387,15 +388,19 @@ namespace AquaModelLibrary
                         }
                         mesh.unkInt0 = 0;
                         mesh.reserve0 = 0;
+
                         outModel.meshList.Add(mesh);
                     }
 
-                    //Finalize material assignment fixes
-                    for (int msh = 0; msh < outModel.meshList.Count; msh++)
+                    if (condenseMaterials)
                     {
-                        var mesh = outModel.meshList[msh];
-                        mesh.mateIndex = newMatReferences[mesh.mateIndex];
-                        outModel.meshList[msh] = mesh;
+                        //Finalize material assignment fixes
+                        for (int msh = 0; msh < outModel.meshList.Count; msh++)
+                        {
+                            var mesh = outModel.meshList[msh];
+                            mesh.mateIndex = newMatReferences[mesh.mateIndex];
+                            outModel.meshList[msh] = mesh;
+                        }
                     }
 
                     //Generate VTXEs and VSETs
@@ -531,7 +536,7 @@ namespace AquaModelLibrary
                         }
                     }
 
-                    SplitMeshByMaterial(aquaModels[msI].models[aqI], matModelSplit);
+                    SplitMeshByMaterialTempData(aquaModels[msI].models[aqI], matModelSplit);
                     if (useRigid == false)
                     {
                         BatchSplitByBoneCountTempData(matModelSplit, outModel, 16);
@@ -2695,12 +2700,13 @@ namespace AquaModelLibrary
         {
             int offset = 0x0; //No NIFL header
             prmModel = new PRMModel();
-            streamReader.Seek(0xC, SeekOrigin.Begin);
             int type = streamReader.Peek<int>();
+            streamReader.Seek(0xC, SeekOrigin.Begin);
+            int iceEnvelopeSize = streamReader.Peek<int>();
             string prmText = "prm\0";
 
             //Deal with deicer's extra header nonsense
-            if (type > 0x10)
+            if (iceEnvelopeSize > 0x10)
             {
                 ReadIceEnvelope(streamReader, Encoding.UTF8.GetString(BitConverter.GetBytes(type)), ref offset, ref prmText);
             }
@@ -3782,7 +3788,7 @@ namespace AquaModelLibrary
                 streamReader.Seek(strCount, SeekOrigin.Current);
 
                 entity.subObjectCount = streamReader.Read<int>();
-                Console.WriteLine($"Position {(streamReader.Position() - offset).ToString("X")}");
+                //Debug.WriteLine($"Position {(streamReader.Position() - offset).ToString("X")}");
                 int trueCount = entity.subObjectCount;
                 //Gather variables
                 for (int obj = 0; obj < trueCount; obj++)

@@ -3,8 +3,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using UnluacNET;
 using Vector3Integer;
 
 namespace AquaModelLibrary.BluePoint.CMSH
@@ -23,14 +25,15 @@ namespace AquaModelLibrary.BluePoint.CMSH
 
         }
 
-        public CMSHFaceData(BufferedStreamReader sr, int vertCount)
+        public CMSHFaceData(BufferedStreamReader sr, CMSHHeader header, int vertCount)
         {
             flags = sr.Read<int>();
             indexCount = sr.Read<int>();
             bool useInts = vertCount > ushort.MaxValue;
-            for(int i = 0; i < indexCount / 3; i++)
+
+            for (int i = 0; i < indexCount / 3; i++)
             {
-                switch(useInts)
+                switch (useInts)
                 {
                     case true:
                         faceList.Add(Vector3Int.Vec3Int.CreateVec3Int(sr.Read<int>(), sr.Read<int>(), sr.Read<int>()));

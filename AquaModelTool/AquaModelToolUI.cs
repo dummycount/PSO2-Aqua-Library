@@ -25,6 +25,10 @@ using AquaModelLibrary.AquaMethods;
 using AquaModelLibrary.Zero;
 using Zamboni.IceFileFormats;
 using System.Reflection;
+using Microsoft.Win32;
+using SaveFileDialog = System.Windows.Forms.SaveFileDialog;
+using OpenFileDialog = System.Windows.Forms.OpenFileDialog;
+using Newtonsoft.Json;
 
 namespace AquaModelTool
 {
@@ -37,11 +41,21 @@ namespace AquaModelTool
         public List<string> motionConfigExtensions = new List<string>() { ".bti" };
         public List<string> motionExtensions = new List<string>() { ".aqm", ".aqv", ".aqc", ".aqw", ".trm", ".trv", ".trw" };
         public DateTime buildDate = GetLinkerTime(System.Reflection.Assembly.GetExecutingAssembly(), TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"));
+        public string soulsSettingsPath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) + "\\";
+        public string soulsSettingsFile = "SoulsSettings.json";
+        JsonSerializerSettings jss = new JsonSerializerSettings() { Formatting = Formatting.Indented };
         public string currentFile;
         public bool isNIFL = false;
 
         public AquaModelTool()
         {
+            SMTSetting smtSetting = new SMTSetting();
+            var finalSettingsPath = Path.Combine(soulsSettingsPath, soulsSettingsFile);
+            var settingText = File.Exists(finalSettingsPath) ? File.ReadAllText(finalSettingsPath) : null;
+            if (settingText != null)
+            {
+                smtSetting = JsonConvert.DeserializeObject<SMTSetting>(settingText);
+            }
             InitializeComponent();
             this.DragEnter += new DragEventHandler(AquaUI_DragEnter);
             this.DragDrop += new DragEventHandler(AquaUI_DragDrop);
@@ -51,6 +65,12 @@ namespace AquaModelTool
 #endif
             filenameButton.Enabled = false;
             this.Text = GetTitleString();
+
+            //Souls Settings
+            exportWithMetadataToolStripMenuItem.Checked = smtSetting.useMetaData;
+            fixFromSoftMeshMirroringToolStripMenuItem.Checked = smtSetting.mirrorMesh;
+            applyMaterialNamesToMeshToolStripMenuItem.Checked = smtSetting.applyMaterialNamesToMesh;
+            transformMeshToolStripMenuItem.Checked = smtSetting.transformMesh;
         }
 
         private void quitToolStripMenuItem_Click(object sender, EventArgs e)
@@ -858,17 +878,17 @@ namespace AquaModelTool
                 }
                 presetTexList.Append("        };\n\n    }\n}");
                 tstaDict.Append("        };\n\n    }\n}");
-                File.WriteAllText(goodFolderDialog.FileName + "\\" + "simpleNGSOutput.csv", simpleOutput.ToString());
-                File.WriteAllText(goodFolderDialog.FileName + "\\" + "detailedNGSOutput.csv", advancedOutput.ToString());
-                File.WriteAllText(goodFolderDialog.FileName + "\\" + "simpleOutputTexSheets.csv", simpleOutputTexSheet.ToString());
-                File.WriteAllText(goodFolderDialog.FileName + "\\" + "detailedOutputTexSheets.csv", advancedOutputTexSheet.ToString());
+                File.WriteAllText(goodFolderDialog.FileName + "\\" + "simpleNGSOutput.csv", simpleOutput.ToString(), Encoding.UTF8);
+                File.WriteAllText(goodFolderDialog.FileName + "\\" + "detailedNGSOutput.csv", advancedOutput.ToString(), Encoding.UTF8);
+                File.WriteAllText(goodFolderDialog.FileName + "\\" + "simpleOutputTexSheets.csv", simpleOutputTexSheet.ToString(), Encoding.UTF8);
+                File.WriteAllText(goodFolderDialog.FileName + "\\" + "detailedOutputTexSheets.csv", advancedOutputTexSheet.ToString(), Encoding.UTF8);
 
                 //Terrible chonks of code for the greater good
-                File.WriteAllText(goodFolderDialog.FileName + "\\" + "NGSShaderDetailPresets.cs", detailDictOutput.ToString());
-                File.WriteAllText(goodFolderDialog.FileName + "\\" + "NGSShaderExtraPresets.cs", extraDictOutput.ToString());
-                File.WriteAllText(goodFolderDialog.FileName + "\\" + "NGSShaderUnk0ValuesPresets.cs", unk0DictOutput.ToString());
-                File.WriteAllText(goodFolderDialog.FileName + "\\" + "NGSShaderTexInfoPresets.cs", presetTexList.ToString());
-                File.WriteAllText(goodFolderDialog.FileName + "\\" + "NGSShaderTexSetPresets.cs", tstaDict.ToString());
+                File.WriteAllText(goodFolderDialog.FileName + "\\" + "NGSShaderDetailPresets.cs", detailDictOutput.ToString(), Encoding.UTF8);
+                File.WriteAllText(goodFolderDialog.FileName + "\\" + "NGSShaderExtraPresets.cs", extraDictOutput.ToString(), Encoding.UTF8);
+                File.WriteAllText(goodFolderDialog.FileName + "\\" + "NGSShaderUnk0ValuesPresets.cs", unk0DictOutput.ToString(), Encoding.UTF8);
+                File.WriteAllText(goodFolderDialog.FileName + "\\" + "NGSShaderTexInfoPresets.cs", presetTexList.ToString(), Encoding.UTF8);
+                File.WriteAllText(goodFolderDialog.FileName + "\\" + "NGSShaderTexSetPresets.cs", tstaDict.ToString(), Encoding.UTF8);
             }
 
             aquaUI.aqua.aquaModels.Clear();
@@ -1262,14 +1282,24 @@ namespace AquaModelTool
                         }
                     }
 
-                    var model = aquaUI.aqua.aquaModels[0].models[0];
-                    if (model.objc.type > 0xC32)
-                    {
-                        model.splitVSETPerMesh();
-                    }
+                    var modelCount = exportLODModelsIfInSameaqpToolStripMenuItem.Checked ? aquaUI.aqua.aquaModels[0].models.Count : 1;
 
-                    model.FixHollowMatNaming();
-                    FbxExporter.ExportToFile(model, aquaUI.aqua.aquaBones[0], aqms, saveFileDialog.FileName, aqmFileNames, includeMetadata);
+                    for(int i = 0; i < aquaUI.aqua.aquaModels[0].models.Count && i < modelCount; i++)
+                    {
+                        var model = aquaUI.aqua.aquaModels[0].models[i];
+                        if (model.objc.type > 0xC32)
+                        {
+                            model.splitVSETPerMesh();
+                        }
+                        model.FixHollowMatNaming();
+
+                        var name = saveFileDialog.FileName;
+                        if (modelCount > 1)
+                        {
+                            name = Path.Combine(Path.GetDirectoryName(name), Path.GetFileNameWithoutExtension(name) + $"_{i}.fbx");
+                        }
+                        FbxExporter.ExportToFile(model, aquaUI.aqua.aquaBones[0], aqms, name, aqmFileNames, new List<Matrix4x4>(), includeMetadata);
+                    }
                 }
             }
         }
@@ -1987,12 +2017,13 @@ namespace AquaModelTool
                 foreach (var filename in openFileDialog.FileNames)
                 {
                     AquaObject model;
+                    bool isPrm = false;
                     var ext = Path.GetExtension(filename);
                     if (simpleModelExtensions.Contains(ext))
                     {
                         aqua.LoadPRM(filename);
                         aqua.ConvertPRMToAquaObject();
-                        model = aqua.aquaModels[0].models[0];
+                        isPrm = true;
                     }
                     else
                     {
@@ -2017,19 +2048,44 @@ namespace AquaModelTool
                             aqua.aquaBones.Clear();
                             if (!File.Exists(bonePath)) //We need bones for this
                             {
-                                continue;
+                                //Check group 1 if group 2 doesn't have them
+                                bonePath = bonePath.Replace("group2", "group1");
+                                if (!File.Exists(bonePath))
+                                {
+                                    bonePath = null;
+                                }
                             }
-                            aqua.ReadBones(bonePath);
+                            if(bonePath != null)
+                            {
+                                aqua.ReadBones(bonePath);
+                            } else
+                            {
+                                //If we really can't find anything, make a placeholder
+                                aqua.aquaBones.Add(AquaNode.GenerateBasicAQN());
+                            }
                         }
                         aqua.ReadModel(filename);
-                        model = aqua.aquaModels[0].models[0];
-                        if (model.objc.type > 0xC32)
+                    }
+
+
+                    var modelCount = !isPrm && exportLODModelsIfInSameaqpToolStripMenuItem.Checked ? aquaUI.aqua.aquaModels[0].models.Count : 1;
+
+                    for (int i = 0; i < aqua.aquaModels[0].models.Count && i < modelCount; i++)
+                    {
+                        model = aqua.aquaModels[0].models[i];
+                        if (!isPrm && model.objc.type > 0xC32)
                         {
                             model.splitVSETPerMesh();
                         }
+                        model.FixHollowMatNaming();
+
+                        var name = Path.ChangeExtension(filename, ".fbx");
+                        if (modelCount > 1)
+                        {
+                            name = Path.Combine(Path.GetDirectoryName(name), Path.GetFileNameWithoutExtension(name) + $"_{i}.fbx");
+                        }
+                        FbxExporter.ExportToFile(model, aqua.aquaBones[0], new List<AquaMotion>(), name, new List<string>(), new List<Matrix4x4>(), includeMetadataToolStripMenuItem.Checked);
                     }
-                    model.FixHollowMatNaming();
-                    FbxExporter.ExportToFile(model, aqua.aquaBones[0], new List<AquaMotion>(), Path.ChangeExtension(filename, ".fbx"), new List<string>(), includeMetadataToolStripMenuItem.Checked);
                     aqua.aquaBones.Clear();
                     aqua.aquaModels.Clear();
                 }
@@ -2403,7 +2459,7 @@ namespace AquaModelTool
                         boneLocalInvInvRots.Add(invInvRot);
                     }
                     boneLocalRots.Add(rot);
-                    boneLocalQuats.Add(AquaModelLibrary.Extra.MathExtras.EulerToQuaternion(node.eulRot.X, node.eulRot.Y, node.eulRot.Z));
+                    boneLocalQuats.Add(AquaModelLibrary.Extra.MathExtras.EulerToQuaternion(node.eulRot));
                     Matrix4x4 mat = Matrix4x4.Identity;
 
                     mat *= Matrix4x4.CreateScale(scale);
@@ -2488,8 +2544,6 @@ namespace AquaModelTool
                 AquaUtil aqua = new AquaUtil();
                 aqua.ReadBones(openFileDialog.FileName);
 
-                StringBuilder sb3 = new StringBuilder();
-                StringBuilder sb2 = new StringBuilder();
                 StringBuilder sb = new StringBuilder();
                 var bn = aqua.aquaBones[0];
                 for (int i = 0; i < bn.nodeList.Count; i++)
@@ -2505,14 +2559,29 @@ namespace AquaModelTool
                     }
                     sb.AppendLine($"Pos {node.pos.X} {node.pos.Y} {node.pos.Z}");
                     sb.AppendLine($"Euler Rot {node.eulRot.X} {node.eulRot.Y} {node.eulRot.Z}");
-                    var quat = MathExtras.EulerToQuaternion(node.eulRot.X, node.eulRot.Y, node.eulRot.Z);
-                    sb.AppendLine($"Euler Rot to Quat {quat.X} {quat.Y} {quat.Z} {quat.W}");
+                    var quatXyz = MathExtras.EulerToQuaternionByOrder(node.eulRot, RotationOrder.XYZ);
+                    var quatXzy = MathExtras.EulerToQuaternionByOrder(node.eulRot, RotationOrder.XZY);
+                    var quatYzx = MathExtras.EulerToQuaternionByOrder(node.eulRot, RotationOrder.YZX);
+                    var quatYxz = MathExtras.EulerToQuaternionByOrder(node.eulRot, RotationOrder.YXZ);
+                    var quatZxy = MathExtras.EulerToQuaternionByOrder(node.eulRot, RotationOrder.ZXY);
+                    var quatZyx = MathExtras.EulerToQuaternionByOrder(node.eulRot, RotationOrder.ZYX);
+                    sb.AppendLine($"XYZ Euler Rot to Quat {quatXyz.X} {quatXyz.Y} {quatXyz.Z} {quatXyz.W}");
+                    sb.AppendLine($"XZY Euler Rot to Quat {quatXzy.X} {quatXzy.Y} {quatXzy.Z} {quatXzy.W}");
+                    sb.AppendLine($"YZX Euler Rot to Quat {quatYzx.X} {quatYzx.Y} {quatYzx.Z} {quatYzx.W}");
+                    sb.AppendLine($"YXZ Euler Rot to Quat {quatYxz.X} {quatYxz.Y} {quatYxz.Z} {quatYxz.W}");
+                    sb.AppendLine($"ZXY Euler Rot to Quat {quatZxy.X} {quatZxy.Y} {quatZxy.Z} {quatZxy.W}");
+                    sb.AppendLine($"ZYX Euler Rot to Quat {quatZyx.X} {quatZyx.Y} {quatZyx.Z} {quatZyx.W}");
                     sb.AppendLine($"Scale {node.scale.X} {node.scale.Y} {node.scale.Z}");
                     sb.AppendLine($"");
 
                     Matrix4x4.Invert(node.GetInverseBindPoseMatrix(), out var mat);
                     Matrix4x4.Decompose(mat, out var scale, out var rotation, out var pos);
-                    Vector3 localEulRot;
+                    Vector3 localEulRotXyz;
+                    Vector3 localEulRotXzy;
+                    Vector3 localEulRotYzx;
+                    Vector3 localEulRotYxz;
+                    Vector3 localEulRotZxy;
+                    Vector3 localEulRotZyx;
                     Vector3 worldEulRot = MathExtras.QuaternionToEuler(rotation);
                     Quaternion localQuat;
                     Quaternion invParentRot = new Quaternion(-1, -1, -1, -1);
@@ -2522,28 +2591,38 @@ namespace AquaModelTool
                         Matrix4x4.Decompose(parMat, out var parScale, out var parRot, out var parPos);
                         var invParRot = Quaternion.Inverse(parRot);
                         localQuat = rotation * invParRot;
-                        localEulRot = MathExtras.QuaternionToEuler(rotation * invParRot);
+                        localEulRotXyz = MathExtras.QuaternionToEulerByOrder(rotation * invParRot, RotationOrder.XYZ);
+                        localEulRotXzy = MathExtras.QuaternionToEulerByOrder(rotation * invParRot, RotationOrder.XZY);
+                        localEulRotYzx = MathExtras.QuaternionToEulerByOrder(rotation * invParRot, RotationOrder.YZX);
+                        localEulRotYxz = MathExtras.QuaternionToEulerByOrder(rotation * invParRot, RotationOrder.YXZ);
+                        localEulRotZxy = MathExtras.QuaternionToEulerByOrder(rotation * invParRot, RotationOrder.ZXY);
+                        localEulRotZyx = MathExtras.QuaternionToEulerByOrder(rotation * invParRot, RotationOrder.ZYX);
                         invParentRot = invParRot;
                     } else
                     {
-                        localEulRot = worldEulRot;
+                        localEulRotXyz = worldEulRot;
+                        localEulRotXzy = MathExtras.QuaternionToEulerByOrder(rotation, RotationOrder.XZY);
+                        localEulRotYzx = MathExtras.QuaternionToEulerByOrder(rotation, RotationOrder.YZX);
+                        localEulRotYxz = MathExtras.QuaternionToEulerByOrder(rotation, RotationOrder.YXZ);
+                        localEulRotZxy = MathExtras.QuaternionToEulerByOrder(rotation, RotationOrder.ZXY);
+                        localEulRotZyx = MathExtras.QuaternionToEulerByOrder(rotation, RotationOrder.ZYX);
                         localQuat = rotation;
                     }
                     sb.AppendLine($"Inv Bind World Pos {pos.X} {pos.Y} {pos.Z}");
-                    sb.AppendLine($"Inv Bind Local Euler Rot {localEulRot.X} {localEulRot.Y} {localEulRot.Z}");
+                    sb.AppendLine($"XYZ Inv Bind Local Euler Rot {localEulRotXyz.X} {localEulRotXyz.Y} {localEulRotXyz.Z}");
+                    sb.AppendLine($"XZY Inv Bind Local Euler Rot {localEulRotXzy.X} {localEulRotXzy.Y} {localEulRotXzy.Z}");
+                    sb.AppendLine($"YZX Inv Bind Local Euler Rot {localEulRotYzx.X} {localEulRotYzx.Y} {localEulRotYzx.Z}");
+                    sb.AppendLine($"YXZ Inv Bind Local Euler Rot {localEulRotYxz.X} {localEulRotYxz.Y} {localEulRotYxz.Z}");
+                    sb.AppendLine($"ZXY Inv Bind Local Euler Rot {localEulRotZxy.X} {localEulRotZxy.Y} {localEulRotZxy.Z}");
+                    sb.AppendLine($"ZYX Inv Bind Local Euler Rot {localEulRotZyx.X} {localEulRotZyx.Y} {localEulRotZyx.Z}");
                     sb.AppendLine($"Inv Bind World Euler Rot {worldEulRot.X} {worldEulRot.Y} {worldEulRot.Z}");
                     sb.AppendLine($"Inv Bind Local Quat Rot {localQuat.X} {localQuat.Y} {localQuat.Z} {localQuat.W}");
                     sb.AppendLine($"Inv Bind World Quat Rot {rotation.X} {rotation.Y} {rotation.Z} {rotation.W}");
                     sb.AppendLine($"Inv Bind World Scale {scale.X} {scale.Y} {scale.Z}");
                     sb.AppendLine($"===");
                     sb.AppendLine($"");
-
-                    sb3.AppendLine($"{{ {{Bone {i}}}  {{NGS Sibling {node.ngsRotationOrderChangeCounter}}} {{Inverse Parent World Quaternion Rotation {invParentRot.X} {invParentRot.Y} {invParentRot.Z} {invParentRot.W}}} {{World Quaternion Rotation {rotation.X} {rotation.Y} {rotation.Z} {rotation.W}}} {{Local Euler Rotation {node.eulRot.X} {node.eulRot.Y} {node.eulRot.Z}}} {{Generated Local Euler Rot {localEulRot.X} {localEulRot.Y} {localEulRot.Z}}} }}");
-                    sb2.AppendLine($"{{ {{Bone {i}}} {{Inverse Parent World Quaternion Rotation {invParentRot.X} {invParentRot.Y} {invParentRot.Z} {invParentRot.W}}} {{World Quaternion Rotation {rotation.X} {rotation.Y} {rotation.Z} {rotation.W}}} {{Local Euler Rotation {node.eulRot.X} {node.eulRot.Y} {node.eulRot.Z}}} {{Generated Local Euler Rot {localEulRot.X} {localEulRot.Y} {localEulRot.Z}}} }}");
                 }
                 File.WriteAllText($"C:\\{Path.GetFileName(openFileDialog.FileName)}.txt", sb.ToString());
-                File.WriteAllText($"C:\\{Path.GetFileName(openFileDialog.FileName)}_GPT.txt", sb2.ToString());
-                File.WriteAllText($"C:\\{Path.GetFileName(openFileDialog.FileName)}_GPT2.txt", sb3.ToString());
             }
         }
 
@@ -2614,8 +2693,8 @@ namespace AquaModelTool
                     int id = NumberPrompt.ShowDialog("map");
                     if (id >= 0)
                     {
-                        PSO2MapHandler.pngMode = true;
-                        PSO2MapHandler.DumpNGSMapData(goodFolderDialog.FileName, goodFolderDialog2.FileName, id);
+                        PSO2MapHandler.pngMode = convertMapTexturesTopngToolStripMenuItem.Checked;
+                        PSO2MapHandler.DumpMapData(goodFolderDialog.FileName, goodFolderDialog2.FileName, id);
                     }
                 }
             }
@@ -3058,7 +3137,7 @@ namespace AquaModelTool
                         dropData.Add($"{itemName},{drops.itemIds[i]:X8},1/{drops.rates[i]}");
                     }
 
-                    File.WriteAllLines(fname + ".csv", dropData);
+                    File.WriteAllLines(fname + ".csv", dropData, Encoding.UTF8);
                 }
             }
         }
@@ -3121,7 +3200,7 @@ namespace AquaModelTool
                         dropData.Add($"{itemName},{drops.itemIds[i]:X8},1/{drops.rates[i]}");
                     }
 
-                    File.WriteAllLines(fname + ".csv", dropData);
+                    File.WriteAllLines(fname + ".csv", dropData, Encoding.UTF8);
                 }
             }
         }
@@ -3206,7 +3285,7 @@ namespace AquaModelTool
                             $"{drops.enemyData[i].u16_14},{drops.enemyData[i].u16_16},{drops.enemyData[i].u16_18},{drops.enemyData[i].u16_1A},{drops.enemyData[i].u16_1C},{drops.enemyData[i].u16_1E},{drops.enemyData[i].u16_20},{drops.enemyData[i].u16_22}");
                     }
 
-                    File.WriteAllLines(fname + ".csv", dropData);
+                    File.WriteAllLines(fname + ".csv", dropData, Encoding.UTF8);
                 }
             }
         }
@@ -3335,60 +3414,23 @@ namespace AquaModelTool
             }
         }
 
-        private void convertSoulsflverToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            OpenFileDialog openFileDialog = new OpenFileDialog()
-            {
-                Title = "Select From Software flver, MDL4 file(s)",
-                Filter = "From Software flver, MDL4 Files (*.flver, *.flv, *.mdl)|*.flver;*.flv;*.mdl|All Files (*.*)|*",
-                Multiselect = true
-            };
-            if (openFileDialog.ShowDialog() == DialogResult.OK)
-            {
-                List<string> failedFiles = new List<string>();
-                foreach (var file in openFileDialog.FileNames)
-                {
-                    aquaUI.aqua.aquaModels.Clear();
-                    ModelSet set = new ModelSet();
-                    set.models.Add(SoulsConvert.ReadFlver(file, out AquaNode aqn));
-                    var outName = Path.ChangeExtension(file, ".aqp");
-                    if (set.models[0] != null && set.models[0].vtxlList.Count > 0)
-                    {
-                        aquaUI.aqua.aquaModels.Add(set);
-                        aquaUI.aqua.ConvertToNGSPSO2Mesh(false, false, false, true, false, false, false, true);
-                        aquaUI.aqua.WriteNGSNIFLModel(outName, outName);
-                    }
-                    AquaUtil.WriteBones(Path.ChangeExtension(outName, ".aqn"), aqn);
-                }
-            }
-        }
-
         private void convertSoulsflverTofbxToolStripMenuItem_Click(object sender, EventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog()
             {
-                Title = "Select From Software flver, MDL4 file(s)",
-                Filter = "From Software flver, MDL4 Files (*.flver, *.flv, *.mdl)|*.flver;*.flv;*.mdl|All Files (*.*)|*",
+                Title = "Select From Software flver, MDL4, TPF, or BND file(s)",
+                Filter = "From Software flver, MDL4, or BND Files (*.flver, *.flv, *.mdl, *.*bnd, *.dcx, *.tpf)|*.flver;*.flv;*.mdl;*.*bnd;*.dcx;*.tpf|All Files (*.*)|*",
                 Multiselect = true
             };
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                List<string> failedFiles = new List<string>();
+                SoulsConvert.useMetaData = exportWithMetadataToolStripMenuItem.Checked;
+                SoulsConvert.applyMaterialNamesToMesh = applyMaterialNamesToMeshToolStripMenuItem.Checked;
+                SoulsConvert.mirrorMesh = fixFromSoftMeshMirroringToolStripMenuItem.Checked;
+                SoulsConvert.transformMesh = transformMeshToolStripMenuItem.Checked;
                 foreach (var file in openFileDialog.FileNames)
                 {
-                    aquaUI.aqua.aquaModels.Clear();
-                    ModelSet set = new ModelSet();
-                    set.models.Add(SoulsConvert.ReadFlver(file, out AquaNode aqn, exportWithMetadataToolStripMenuItem.Checked));
-                    var outName = Path.ChangeExtension(file, ".aqp");
-                    if (set.models[0] != null && set.models[0].vtxlList.Count > 0)
-                    {
-                        aquaUI.aqua.aquaModels.Add(set);
-                        aquaUI.aqua.ConvertToNGSPSO2Mesh(false, false, false, true, false, false, false, true);
-                        set.models[0].ConvertToLegacyTypes();
-                        set.models[0].CreateTrueVertWeights();
-
-                        FbxExporter.ExportToFile(aquaUI.aqua.aquaModels[0].models[0], aqn, new List<AquaMotion>(), Path.ChangeExtension(file, ".fbx"), new List<string>(), false);
-                    }
+                    SoulsConvert.ConvertFile(file);
                 }
             }
         }
@@ -3612,37 +3654,6 @@ namespace AquaModelTool
             }
         }
 
-        private void convertDemonsSoulsPS5CmdlToaqpaqnToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            OpenFileDialog openFileDialog = new OpenFileDialog()
-            {
-                Title = "Select Demon's Souls PS5 cmdl file(s)",
-                Filter = "Demon's Souls PS5 cmsh Files (*.cmsh, *.cmdl)|*.cmsh;*.cmdl|All Files (*.*)|*",
-                Multiselect = true
-            };
-            if (openFileDialog.ShowDialog() == DialogResult.OK)
-            {
-                List<string> failedFiles = new List<string>();
-                foreach (var file in openFileDialog.FileNames)
-                {
-                    aquaUI.aqua.aquaModels.Clear();
-                    ModelSet set = new ModelSet();
-                    set.models.Add(BluePointConvert.ReadCMDL(file, out AquaNode aqn));
-                    var outName = Path.ChangeExtension(file, ".aqp");
-                    if (set.models[0] != null && set.models[0].vtxlList.Count > 0)
-                    {
-                        aquaUI.aqua.aquaModels.Add(set);
-                        aquaUI.aqua.ConvertToNGSPSO2Mesh(false, false, false, true, false, false, false, true);
-                        aquaUI.aqua.WriteNGSNIFLModel(outName, outName);
-                    }
-                    if(aqn != null)
-                    {
-                        AquaUtil.WriteBones(Path.ChangeExtension(outName, ".aqn"), aqn);
-                    }
-                }
-            }
-        }
-
         private void convertDemonsSoulsPS5CmdlToFbxToolStripMenuItem_Click(object sender, EventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog()
@@ -3653,13 +3664,11 @@ namespace AquaModelTool
             };
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                List<string> failedFiles = new List<string>();
                 foreach (var file in openFileDialog.FileNames)
                 {
                     aquaUI.aqua.aquaModels.Clear();
                     ModelSet set = new ModelSet();
                     set.models.Add(BluePointConvert.ReadCMDL(file, out AquaNode aqn));
-                    var outName = Path.ChangeExtension(file, ".aqp");
                     if (set.models[0] != null && set.models[0].vtxlList.Count > 0)
                     {
                         aquaUI.aqua.aquaModels.Add(set);
@@ -3667,7 +3676,7 @@ namespace AquaModelTool
                         set.models[0].ConvertToLegacyTypes();
                         set.models[0].CreateTrueVertWeights();
 
-                        FbxExporter.ExportToFile(aquaUI.aqua.aquaModels[0].models[0], aqn, new List<AquaMotion>(), Path.ChangeExtension(file, ".fbx"), new List<string>(), false);
+                        FbxExporter.ExportToFile(aquaUI.aqua.aquaModels[0].models[0], aqn, new List<AquaMotion>(), Path.ChangeExtension(file, ".fbx"), new List<string>(), new List<Matrix4x4>(), false);
                     }
                 }
             }
@@ -3741,7 +3750,7 @@ namespace AquaModelTool
                             var nom = new AquaModelLibrary.PSU.NOM(File.ReadAllBytes(file));
                             List<AquaMotion> aqms = new List<AquaMotion>();
                             aqms.Add(nom.GetPSO2MotionPSUBody(bones));
-                            FbxExporter.ExportToFile(aquaUI.aqua.aquaModels[0].models[0], bones, aqms, file.Replace(".nom", ".fbx"), new List<string>() { Path.GetFileName(file) }, true);
+                            FbxExporter.ExportToFile(aquaUI.aqua.aquaModels[0].models[0], bones, aqms, file.Replace(".nom", ".fbx"), new List<string>() { Path.GetFileName(file) }, new List<Matrix4x4>(), true);
                         }
                     }
                 }
@@ -3955,9 +3964,259 @@ namespace AquaModelTool
             }
         }
 
-        private void exportWithMetadataToolStripMenuItem_Click(object sender, EventArgs e)
+        private void readMCGMCPToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            exportWithMetadataToolStripMenuItem.Checked = !exportWithMetadataToolStripMenuItem.Checked;
+            var openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select MCP/MCG File",
+                Filter = "MCP/MCG files|*.mcg;*.mcp",
+                FileName = "",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    SoulsConvert.ReadSoulsFile(file);
+                }
+            }
+        }
+
+        private void readMSBToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select MSB File",
+                Filter = "MSB files|*.msb",
+                FileName = "",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    SoulsConvert.ReadSoulsFile(file);
+                }
+            }
+        }
+
+        private void generateMCGMCPToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CommonOpenFileDialog goodFolderDialog = new CommonOpenFileDialog()
+            {
+                IsFolderPicker = true,
+                Multiselect = true,
+                Title = "Select Demon's Souls m**_**_**_** folders for connected areas",
+            };
+            if (goodFolderDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                AquaModelLibrary.Extra.FromSoft.SoulsMapMetadataGenerator.Generate(goodFolderDialog.FileNames.ToList(), out var mcCombo);
+            }
+        }
+
+        private void nullMCGUnksToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select MCG File",
+                Filter = "MCG files|*.mcg",
+                FileName = "",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    SoulsConvert.NullUnkIndices(file);
+                }
+            }
+        }
+
+        private void parseCANIToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select Demon's Souls PS5 cani file(s)",
+                Filter = "Demon's Souls PS5 cani Files (*.cani)|*.cani|All Files (*.*)|*",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                List<string> failedFiles = new List<string>();
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    var cani = BluePointConvert.ReadCANI(file);
+                    /*
+                    aquaUI.aqua.aquaModels.Clear();
+                    ModelSet set = new ModelSet();
+                    set.models.Add(BluePointConvert.ReadCMDL(file, out AquaNode aqn));
+                    var outName = Path.ChangeExtension(file, ".aqp");*/
+                    /*if (set.models[0] != null && set.models[0].vtxlList.Count > 0)
+                    {
+                        aquaUI.aqua.aquaModels.Add(set);
+                        aquaUI.aqua.ConvertToNGSPSO2Mesh(false, false, false, true, false, false, false, true);
+                        set.models[0].ConvertToLegacyTypes();
+                        set.models[0].CreateTrueVertWeights();
+
+                        FbxExporter.ExportToFile(aquaUI.aqua.aquaModels[0].models[0], aqn, new List<AquaMotion>(), Path.ChangeExtension(file, ".fbx"), new List<string>(), false);
+                    }*/
+                }
+            }
+        }
+
+        private void parseDRBToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select DRB File",
+                Filter = "DRB files|*.drb",
+                FileName = "",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    SoulsConvert.ReadSoulsFile(file);
+                }
+            }
+        }
+
+        private void usePCDirectoriesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CharacterMakingIndex.pcDirectory = usePCDirectoriesToolStripMenuItem.Checked;
+            AquaGeneralMethods.useFileNameHash = usePCDirectoriesToolStripMenuItem.Checked;
+        }
+
+        private void sortCMSHToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select CMSH File",
+                Filter = "CMSH files|*.cmsh",
+                FileName = "",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                var baseDir = Path.GetDirectoryName(openFileDialog.FileNames[0]);
+                Directory.CreateDirectory(Path.Combine(baseDir, "NoInfo", "80"));
+                Directory.CreateDirectory(Path.Combine(baseDir, "NoInfo", "81"));
+
+                Directory.CreateDirectory(Path.Combine(baseDir, "DeSType", "82"));
+                Directory.CreateDirectory(Path.Combine(baseDir, "DeSType", "200"));
+                Directory.CreateDirectory(Path.Combine(baseDir, "DeSType", "500"));
+                Directory.CreateDirectory(Path.Combine(baseDir, "DeSType", "A01"));
+
+                Directory.CreateDirectory(Path.Combine(baseDir, "DeSType", "AA01"));
+                Directory.CreateDirectory(Path.Combine(baseDir, "DeSType", "2A01"));
+                Directory.CreateDirectory(Path.Combine(baseDir, "DeSType", "ACC"));
+                Directory.CreateDirectory(Path.Combine(baseDir, "Compact", "88"));
+
+                Directory.CreateDirectory(Path.Combine(baseDir, "Compact", "89"));
+                Directory.CreateDirectory(Path.Combine(baseDir, "CMSH_Ref", "5"));
+                Directory.CreateDirectory(Path.Combine(baseDir, "CMSH_Ref", "D"));
+                Directory.CreateDirectory(Path.Combine(baseDir, "CMSH_Ref", "15"));
+
+                Directory.CreateDirectory(Path.Combine(baseDir, "CMSH_Ref", "41"));
+                Directory.CreateDirectory(Path.Combine(baseDir, "CMSH_Ref", "4901"));
+                Directory.CreateDirectory(Path.Combine(baseDir, "CMSH_Ref", "5100"));
+                Directory.CreateDirectory(Path.Combine(baseDir, "CMSH_Ref", "1100"));
+
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    BluePointConvert.ReadFileTest(file, out int start, out int flags, out int modelType);
+                    switch (start)
+                    {
+                        case 0x1100:
+                            File.Move(file, Path.Combine(baseDir, "CMSH_Ref", "1100", Path.GetFileName(file)));
+                            break;
+                        case 0x5100:
+                            File.Move(file, Path.Combine(baseDir, "CMSH_Ref", "5100", Path.GetFileName(file)));
+                            break;
+                        case 0x4901:
+                            File.Move(file, Path.Combine(baseDir, "CMSH_Ref", "4901", Path.GetFileName(file)));
+                            break;
+                        case 0x4100:
+                            File.Move(file, Path.Combine(baseDir, "CMSH_Ref", "41", Path.GetFileName(file)));
+                            break;
+                        case 0xAA01:
+                            File.Move(file, Path.Combine(baseDir, "DeSType", "AA01", Path.GetFileName(file)));
+                            break;
+                        case 0x2A01:
+                            File.Move(file, Path.Combine(baseDir, "DeSType", "2A01", Path.GetFileName(file)));
+                            break;
+                        case 0xA8C:
+                        case 0x68C:
+                            switch (modelType)
+                            {
+                                case 0x2:
+                                case 0xA:
+                                    break;
+                                case 0x5:
+                                    File.Move(file, Path.Combine(baseDir, "CMSH_Ref", "5", Path.GetFileName(file)));
+                                    continue;
+                                case 0xD:
+                                    File.Move(file, Path.Combine(baseDir, "CMSH_Ref", "D", Path.GetFileName(file)));
+                                    continue;
+                                case 0x15:
+                                    File.Move(file, Path.Combine(baseDir, "CMSH_Ref", "15", Path.GetFileName(file)));
+                                    continue;  
+                                default:
+                                    break;
+                            }
+
+                            switch (flags)
+                            {
+                                case 0x89:
+                                    File.Move(file, Path.Combine(baseDir, "Compact", "89", Path.GetFileName(file)));
+                                    break;
+                                case 0x88:
+                                    File.Move(file, Path.Combine(baseDir, "Compact", "88", Path.GetFileName(file)));
+                                    break;
+                                case 0x80:
+                                    File.Move(file, Path.Combine(baseDir, "NoInfo", "80", Path.GetFileName(file)));
+                                    break;
+                                case 0x81:
+                                    File.Move(file, Path.Combine(baseDir, "NoInfo", "81", Path.GetFileName(file)));
+                                    break;
+                                case 0x82:
+                                    File.Move(file, Path.Combine(baseDir, "DeSType", "82", Path.GetFileName(file)));
+                                    break;
+                                default:
+                                    break;
+                            }
+                            break;
+                        case 0xACC:
+                            File.Move(file, Path.Combine(baseDir, "DeSType", "ACC", Path.GetFileName(file)));
+                            break;
+                        case 0x200:
+                            File.Move(file, Path.Combine(baseDir, "DeSType", "200", Path.GetFileName(file)));
+                            break;
+                        case 0x500:
+                            File.Move(file, Path.Combine(baseDir, "DeSType", "500", Path.GetFileName(file)));
+                            break;
+                        case 0xA01:
+                            File.Move(file, Path.Combine(baseDir, "DeSType", "A01", Path.GetFileName(file)));
+                            break;
+                        default:
+                            break;
+                    }
+
+                }
+            }
+        }
+
+        private void SaveSoulsSettings(object sender, EventArgs e)
+        {
+            SMTSetting smtSetting = new SMTSetting();
+            smtSetting.useMetaData = exportWithMetadataToolStripMenuItem.Checked;
+            smtSetting.mirrorMesh = fixFromSoftMeshMirroringToolStripMenuItem.Checked;
+            smtSetting.applyMaterialNamesToMesh = applyMaterialNamesToMeshToolStripMenuItem.Checked;
+            smtSetting.transformMesh = transformMeshToolStripMenuItem.Checked;
+
+            string smtSettingText = JsonConvert.SerializeObject(smtSetting, jss);
+            File.WriteAllText(soulsSettingsPath + soulsSettingsFile, smtSettingText);
         }
     }
 }

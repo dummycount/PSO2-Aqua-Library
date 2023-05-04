@@ -897,7 +897,7 @@ namespace AquaModelLibrary
             {
                 for (int vert = 0; vert < vertData[vset].vertPositions.Count; vert++)
                 {
-                    float distance = Distance(center, vertData[vset].vertPositions[vert]);
+                    float distance = Extra.MathExtras.Distance(center, vertData[vset].vertPositions[vert]);
                     if (distance > radius)
                     {
                         radius = distance;
@@ -911,11 +911,6 @@ namespace AquaModelLibrary
             bounds.boundingRadius = radius;
 
             return bounds;
-        }
-
-        public static float Distance(Vector3 point1, Vector3 point2)
-        {
-            return (float)Math.Sqrt(Math.Pow(point2.X - point1.X, 2) + Math.Pow(point2.Y - point1.Y, 2) + Math.Pow(point2.Z - point1.Z, 2));
         }
         
         //Adapted from this: https://forums.cgsociety.org/t/finding-bi-normals-tangents/975005/8 
@@ -1611,7 +1606,7 @@ namespace AquaModelLibrary
                             vtxl.bonePalette.AddRange(referenceVTXL.bonePalette);
                         }
                         boneIdList.Add(boneIds);
-                        if(outModel.meshNames.Count > modelId)
+                        if(model.meshNames.Count > modelId)
                         {
                             outModel.meshNames.Add(model.meshNames[modelId]);
                         }
@@ -1932,7 +1927,9 @@ namespace AquaModelLibrary
             outModel.tempMats = model.tempMats;
         }
 
-        public static void SplitMeshByMaterial(AquaObject model, AquaObject outModel)
+        //Seemingly not necessary on pso2 data since this split is already a requirement
+        //Therefore, we only operate on temp data
+        public static void SplitMeshByMaterialTempData(AquaObject model, AquaObject outModel)
         {
             for (int i = 0; i < model.tempTris.Count; i++)
             {
@@ -2114,6 +2111,7 @@ namespace AquaModelLibrary
 
         public static void CloneUnprocessedMesh(AquaObject model, AquaObject outModel, int meshId)
         {
+            outModel.meshNames.Add(model.meshNames[meshId]);
             outModel.vtxlList.Add(model.vtxlList[meshId]);
             outModel.tempTris.Add(model.tempTris[meshId]);
         }
@@ -3196,6 +3194,7 @@ namespace AquaModelLibrary
 
             //Get two-sided and alphaCutoff
             nameArr = name.Split('@');
+            name = nameArr[0];
             if(nameArr.Length > 1)
             {
                 for(int i = 1; i < nameArr.Length; i++)
