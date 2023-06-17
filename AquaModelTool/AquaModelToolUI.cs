@@ -1,10 +1,16 @@
 ﻿using AquaModelLibrary;
+using AquaModelLibrary.AquaMethods;
 using AquaModelLibrary.Extra;
-using AquaModelLibrary.Forms.CommonForms;
+using AquaModelLibrary.Extra.AM2;
 using AquaModelLibrary.Native.Fbx;
 using AquaModelLibrary.NNStructs;
 using AquaModelLibrary.Nova;
+using AquaModelLibrary.ToolUX;
+using AquaModelLibrary.ToolUX.CommonForms;
+using AquaModelLibrary.Zero;
 using Microsoft.WindowsAPICodePack.Dialogs;
+using Newtonsoft.Json;
+using Reloaded.Memory.Streams;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -13,22 +19,19 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Zamboni;
+using Zamboni.IceFileFormats;
 using static AquaExtras.FilenameConstants;
-using static AquaModelLibrary.Utility.AquaUtilData;
 using static AquaModelLibrary.AquaMethods.AquaGeneralMethods;
 using static AquaModelLibrary.AquaStructs.ShaderPresetDefaults;
-using AquaModelLibrary.AquaMethods;
-using AquaModelLibrary.Zero;
-using Zamboni.IceFileFormats;
-using System.Reflection;
-using Microsoft.Win32;
-using SaveFileDialog = System.Windows.Forms.SaveFileDialog;
+using static AquaModelLibrary.Utility.AquaUtilData;
 using OpenFileDialog = System.Windows.Forms.OpenFileDialog;
-using Newtonsoft.Json;
+using Path = System.IO.Path;
+using SaveFileDialog = System.Windows.Forms.SaveFileDialog;
 
 namespace AquaModelTool
 {
@@ -41,21 +44,32 @@ namespace AquaModelTool
         public List<string> motionConfigExtensions = new List<string>() { ".bti" };
         public List<string> motionExtensions = new List<string>() { ".aqm", ".aqv", ".aqc", ".aqw", ".trm", ".trv", ".trw" };
         public DateTime buildDate = GetLinkerTime(System.Reflection.Assembly.GetExecutingAssembly(), TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"));
-        public string soulsSettingsPath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) + "\\";
+        public string mainSettingsPath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) + "\\";
+        public string mainSettingsFile = "Settings.json";
         public string soulsSettingsFile = "SoulsSettings.json";
+        public string borderBreakPS4BonePath = "";
         JsonSerializerSettings jss = new JsonSerializerSettings() { Formatting = Formatting.Indented };
         public string currentFile;
         public bool isNIFL = false;
 
         public AquaModelTool()
         {
-            SMTSetting smtSetting = new SMTSetting();
-            var finalSettingsPath = Path.Combine(soulsSettingsPath, soulsSettingsFile);
-            var settingText = File.Exists(finalSettingsPath) ? File.ReadAllText(finalSettingsPath) : null;
-            if (settingText != null)
+            MainSetting mainSetting = new MainSetting();
+            var finalMainSettingsPath = Path.Combine(mainSettingsPath, mainSettingsFile);
+            var mainSettingText = File.Exists(finalMainSettingsPath) ? File.ReadAllText(finalMainSettingsPath) : null;
+            if (mainSettingText != null)
             {
-                smtSetting = JsonConvert.DeserializeObject<SMTSetting>(settingText);
+                mainSetting = JsonConvert.DeserializeObject<MainSetting>(mainSettingText);
             }
+
+            SMTSetting smtSetting = new SMTSetting();
+            var finalSMTSettingsPath = Path.Combine(mainSettingsPath, soulsSettingsFile);
+            var SMTSettingText = File.Exists(finalSMTSettingsPath) ? File.ReadAllText(finalSMTSettingsPath) : null;
+            if (SMTSettingText != null)
+            {
+                smtSetting = JsonConvert.DeserializeObject<SMTSetting>(SMTSettingText);
+            }
+
             InitializeComponent();
             this.DragEnter += new DragEventHandler(AquaUI_DragEnter);
             this.DragDrop += new DragEventHandler(AquaUI_DragDrop);
@@ -65,6 +79,9 @@ namespace AquaModelTool
 #endif
             filenameButton.Enabled = false;
             this.Text = GetTitleString();
+
+            //Border Break PS4 Settings
+            borderBreakPS4BonePath = mainSetting.BBPS4BonePath;
 
             //Souls Settings
             exportWithMetadataToolStripMenuItem.Checked = smtSetting.useMetaData;
@@ -279,9 +296,9 @@ namespace AquaModelTool
                 currentFile = file;
                 this.Text = GetTitleString();
 
-                foreach(var ctrl in filePanel.Controls)
+                foreach (var ctrl in filePanel.Controls)
                 {
-                    if(ctrl is ModelEditor)
+                    if (ctrl is ModelEditor)
                     {
                         ((ModelEditor)ctrl).CloseControlWindows();
                     }
@@ -935,7 +952,7 @@ namespace AquaModelTool
                                 $"{extra.entryFloats.X} {extra.entryFloats.Y} {extra.entryFloats.Z} {extra.entryFloats.W}\n";
                             extData += " CreateExtra(" + $"{extra.entryFlag0}, \"{extra.entryString.GetString()}\",";
                             extData += $" {extra.entryFlag1}, {extra.entryFlag2}";
-                            if(extra.entryFloats != Vector4.Zero)
+                            if (extra.entryFloats != Vector4.Zero)
                             {
                                 extData += $", new Vector4({extra.entryFloats.X}f, {extra.entryFloats.Y}f, {extra.entryFloats.Z}f, {extra.entryFloats.W}f)";
                             }
@@ -1042,23 +1059,23 @@ namespace AquaModelTool
                     }
 
                     combination3 += "{\"" + texString + usedTextures[texString] + "\", new AquaObject.TSTA() {";
-                    if(tex.tag != 0)
+                    if (tex.tag != 0)
                     {
                         combination3 += $"tag = {tex.tag},";
                     }
-                    if(tex.texUsageOrder != 0)
+                    if (tex.texUsageOrder != 0)
                     {
                         combination3 += $"texUsageOrder = {tex.texUsageOrder},";
                     }
-                    if(tex.modelUVSet != 0)
+                    if (tex.modelUVSet != 0)
                     {
                         combination3 += $"modelUVSet = {tex.modelUVSet},";
                     }
-                    if(tex.unkVector0 != Vector3.Zero)
+                    if (tex.unkVector0 != Vector3.Zero)
                     {
                         combination3 += $"unkVector0 = new Vector3({tex.unkVector0.X}f, {tex.unkVector0.Y}f, {tex.unkVector0.Z}f),";
                     }
-                    if(tex.unkFloat2 != 0)
+                    if (tex.unkFloat2 != 0)
                     {
                         combination3 += $"unkFloat2 = {tex.unkFloat2}f,";
                     }
@@ -1257,7 +1274,8 @@ namespace AquaModelTool
                             MessageBox.Show("Must be able to read bones to export properly! Defaulting to single node placeholder.");
                             aquaUI.aqua.aquaBones.Add(AquaNode.GenerateBasicAQN());
                         }
-                    } else
+                    }
+                    else
                     {
                         aquaUI.aqua.ReadBones(bonePath);
                     }
@@ -1272,8 +1290,8 @@ namespace AquaModelTool
                     if (aqmOpenFileDialog.ShowDialog() == DialogResult.OK)
                     {
                         AquaUtil aqmUt = new AquaUtil();
-                        
-                        foreach(var fname in aqmOpenFileDialog.FileNames)
+
+                        foreach (var fname in aqmOpenFileDialog.FileNames)
                         {
                             aqmUt.aquaMotions.Clear();
                             aqmUt.ReadMotion(fname);
@@ -1284,7 +1302,7 @@ namespace AquaModelTool
 
                     var modelCount = exportLODModelsIfInSameaqpToolStripMenuItem.Checked ? aquaUI.aqua.aquaModels[0].models.Count : 1;
 
-                    for(int i = 0; i < aquaUI.aqua.aquaModels[0].models.Count && i < modelCount; i++)
+                    for (int i = 0; i < aquaUI.aqua.aquaModels[0].models.Count && i < modelCount; i++)
                     {
                         var model = aquaUI.aqua.aquaModels[0].models[i];
                         if (model.objc.type > 0xC32)
@@ -2055,10 +2073,11 @@ namespace AquaModelTool
                                     bonePath = null;
                                 }
                             }
-                            if(bonePath != null)
+                            if (bonePath != null)
                             {
                                 aqua.ReadBones(bonePath);
-                            } else
+                            }
+                            else
                             {
                                 //If we really can't find anything, make a placeholder
                                 aqua.aquaBones.Add(AquaNode.GenerateBasicAQN());
@@ -2552,7 +2571,7 @@ namespace AquaModelTool
                     sb.AppendLine($"=== ({i}) {node.boneName.curString}:");
                     sb.AppendLine($"Bone Short 1 {node.boneShort1.ToString("X")} | Bone Short 2 {node.boneShort2.ToString("X")}");
                     sb.AppendLine($"Animated Flag {node.animatedFlag}");
-                    sb.AppendLine($"First Child {node.firstChild} | Next Sibling {node.nextSibling} | NGS Sibling {node.ngsRotationOrderChangeCounter} | Unk Node {node.unkNode}");
+                    sb.AppendLine($"First Child {node.firstChild} | Next Sibling {node.nextSibling} | NGS Sibling {node.bool_1C} | Unk Node {node.unkNode}");
                     if (i != 0)
                     {
                         sb.AppendLine($"Parent info - ({node.parentId}) {bn.nodeList[node.parentId].boneName.curString}");
@@ -2598,7 +2617,8 @@ namespace AquaModelTool
                         localEulRotZxy = MathExtras.QuaternionToEulerByOrder(rotation * invParRot, RotationOrder.ZXY);
                         localEulRotZyx = MathExtras.QuaternionToEulerByOrder(rotation * invParRot, RotationOrder.ZYX);
                         invParentRot = invParRot;
-                    } else
+                    }
+                    else
                     {
                         localEulRotXyz = worldEulRot;
                         localEulRotXzy = MathExtras.QuaternionToEulerByOrder(rotation, RotationOrder.XZY);
@@ -2755,7 +2775,7 @@ namespace AquaModelTool
             {
                 AquaUtil aqu = new AquaUtil();
                 aqu.ReadBones(openFileDialog.FileName);
-                for(int i = 0; i < aqu.aquaBones[0].nodeList.Count; i++)
+                for (int i = 0; i < aqu.aquaBones[0].nodeList.Count; i++)
                 {
                     var bone = aqu.aquaBones[0].nodeList[i];
                     bone.boneShort2 = 0xFFFF;
@@ -2780,8 +2800,8 @@ namespace AquaModelTool
                 AquaUtil aqu = new AquaUtil();
                 Dictionary<string, AquaObject.SHAD> ngsShaders = new Dictionary<string, AquaObject.SHAD>();
                 aqu.ReadModel(openFileDialog.FileName);
-                
-                for(int i = 0; i < aqu.aquaModels[0].models[0].shadList.Count; i++)
+
+                for (int i = 0; i < aqu.aquaModels[0].models[0].shadList.Count; i++)
                 {
                     var shad = aqu.aquaModels[0].models[0].shadList[i];
                     if (shad.isNGS)
@@ -2950,8 +2970,9 @@ namespace AquaModelTool
             };
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                foreach(var path in openFileDialog.FileNames)
+                foreach (var path in openFileDialog.FileNames)
                 {
+                    aquaUI.aqua.aquaModels.Clear();
                     bool useSubPath = true;
                     string subPath = "";
                     string fname = path;
@@ -2971,8 +2992,15 @@ namespace AquaModelTool
                     aqua.aquaModels.Add(set);
                     aqua.ConvertToClassicPSO2Mesh(false, false, false, false, false, false, false);
 
-                    fname = fname.Replace(".rel", ".trp");
-                    aqua.WriteClassicNIFLModel(fname, fname);
+                    if (set.models[0] != null && set.models[0].vtxlList.Count > 0)
+                    {
+                        aquaUI.aqua.aquaModels.Add(set);
+                        aquaUI.aqua.ConvertToNGSPSO2Mesh(false, false, false, true, false, false, false, true);
+                        set.models[0].ConvertToLegacyTypes();
+                        set.models[0].CreateTrueVertWeights();
+
+                        FbxExporter.ExportToFile(aquaUI.aqua.aquaModels[0].models[0], rel.aqn, new List<AquaMotion>(), Path.ChangeExtension(fname, ".fbx"), new List<string>(), new List<Matrix4x4>(), false);
+                    }
                 }
             }
         }
@@ -3041,7 +3069,7 @@ namespace AquaModelTool
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
                 //Read psz
-                foreach(var filename in openFileDialog.FileNames)
+                foreach (var filename in openFileDialog.FileNames)
                 {
                     PSZTextBin.DumpNameBin(filename);
                 }
@@ -3088,7 +3116,7 @@ namespace AquaModelTool
                 Filter = "(enemy_zone_*.rel)|enemy_zone_*.rel",
                 Multiselect = true
             };
-            if(openFileDialog.ShowDialog() == DialogResult.OK)
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
                 Dictionary<int, string> itemNames = new Dictionary<int, string>();
                 OpenFileDialog openFileDialog2;
@@ -3100,11 +3128,11 @@ namespace AquaModelTool
                 if (openFileDialog2.ShowDialog() == DialogResult.OK)
                 {
                     var txt = File.ReadAllLines(openFileDialog2.FileName);
-                    for(int i = 0; i < txt.Length; i++)
+                    for (int i = 0; i < txt.Length; i++)
                     {
                         var line = txt[i];
 
-                        if(line == "")
+                        if (line == "")
                         {
                             continue;
                         }
@@ -3129,7 +3157,7 @@ namespace AquaModelTool
                     var drops = new EnemyZoneDrops(File.ReadAllBytes(fname));
                     List<string> dropData = new List<string>();
                     dropData.Add("Item Name,Item Id,Rate");
-                    for(int i = 0; i < drops.itemCount; i++)
+                    for (int i = 0; i < drops.itemCount; i++)
                     {
                         string itemName;
                         itemNames.TryGetValue(drops.itemIds[i], out itemName);
@@ -3361,7 +3389,7 @@ namespace AquaModelTool
                                     string baseName;
                                     /*try
                                     {*/
-                                        baseName = IceFile.getFileName(innerFiles[i]);
+                                    baseName = IceFile.getFileName(innerFiles[i]);
                                     /*}
                                     catch
                                     {
@@ -3370,7 +3398,7 @@ namespace AquaModelTool
                                     }*/
                                     if (baseName.Contains(".text") || baseName == "namelessFile.bin")
                                     {
-                                        if(outpath == null)
+                                        if (outpath == null)
                                         {
                                             if (file.Contains("_na"))
                                             {
@@ -3599,7 +3627,7 @@ namespace AquaModelTool
 
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    if(!File.Exists(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "DeSMtdLayoutData.bin")))
+                    if (!File.Exists(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "DeSMtdLayoutData.bin")))
                     {
                         MessageBox.Show("No DeSMtdLayoutData.bin detected! Please select a PS3 Demon's Souls game folder!");
                         var browseDialog = new CommonOpenFileDialog()
@@ -3611,7 +3639,8 @@ namespace AquaModelTool
                         if (browseDialog.ShowDialog() == CommonFileDialogResult.Ok)
                         {
                             SoulsConvert.GetDeSLayoutMTDInfo(browseDialog.FileName);
-                        } else
+                        }
+                        else
                         {
                             MessageBox.Show("You MUST have an DeSMtdLayoutData.bin file to proceed!");
                             return;
@@ -3623,34 +3652,6 @@ namespace AquaModelTool
                     var outStr = openFileDialog.FileName.Replace(ext, "_out.flver");
                     SoulsConvert.ConvertModelToFlverAndWrite(openFileDialog.FileName, outStr, 1, true, true, SoulsConvert.SoulsGame.DemonsSouls);
                 }
-            }
-        }
-
-        private void parseMSOToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            OpenFileDialog openFileDialog = new OpenFileDialog()
-            {
-                Title = "Select MySpaceObject",
-                Filter = "MySpaceObject Files (*.mso)|*.mso|All Files (*.*)|*"
-            };
-            if (openFileDialog.ShowDialog() == DialogResult.OK)
-            {
-                var mso = AquaUtil.LoadMSO(openFileDialog.FileName);
-                List<string> msoInfo = new List<string>();
-                msoInfo.Add($"MSO Entries ({mso.entryCount}):");
-                msoInfo.Add($"");
-                int i = 0;
-                foreach(var entry in mso.msoEntries)
-                {
-                    msoInfo.Add($"({i}) Name: {entry.asciiName}");
-                    msoInfo.Add($"Descriptor: {entry.utf8Descriptor}");
-                    msoInfo.Add($"Group Name: {entry.groupName}");
-                    msoInfo.Add($"Traits: [{entry.asciiTrait1}], [{entry.asciiTrait2}], [{entry.asciiTrait3}], [{entry.asciiTrait4}], [{entry.asciiTrait5}]");
-                    msoInfo.Add($"");
-                    i++;
-                }
-
-                File.WriteAllLines(openFileDialog.FileName + "_msoInfo.txt", msoInfo);
             }
         }
 
@@ -3783,11 +3784,11 @@ namespace AquaModelTool
                     foreach (var file in openFileDialog.FileNames)
                     {
                         var animData = ModelImporter.AssimpAQMConvert(file, forceNoCharacterMetadataCheckBox.Checked, true, scaleFactor);
-                        foreach(var anim in animData)
+                        foreach (var anim in animData)
                         {
                             var nom = new AquaModelLibrary.PSU.NOM();
                             nom.CreateFromPSO2Motion(anim.aqm);
-                            
+
                             File.WriteAllBytes(Path.ChangeExtension(Path.Combine(file + "_" + anim.fileName), ".nom"), nom.GetBytes());
                         }
                     }
@@ -3832,7 +3833,7 @@ namespace AquaModelTool
                             {
                                 aq.aquaMotions.Clear();
                                 aq.ReadMotion(file);
-                                if(aq.aquaMotions[0].anims[0].motionKeys.Count < 50)
+                                if (aq.aquaMotions[0].anims[0].motionKeys.Count < 50)
                                 {
                                     continue;
                                 }
@@ -3841,9 +3842,9 @@ namespace AquaModelTool
                                 File.WriteAllBytes(Path.ChangeExtension(file, ".nom"), nom.GetBytes());
                             }
                         }
-                    }   
+                    }
                 }
-                        
+
             }
         }
 
@@ -4161,7 +4162,7 @@ namespace AquaModelTool
                                     continue;
                                 case 0x15:
                                     File.Move(file, Path.Combine(baseDir, "CMSH_Ref", "15", Path.GetFileName(file)));
-                                    continue;  
+                                    continue;
                                 default:
                                     break;
                             }
@@ -4216,7 +4217,409 @@ namespace AquaModelTool
             smtSetting.transformMesh = transformMeshToolStripMenuItem.Checked;
 
             string smtSettingText = JsonConvert.SerializeObject(smtSetting, jss);
-            File.WriteAllText(soulsSettingsPath + soulsSettingsFile, smtSettingText);
+            File.WriteAllText(mainSettingsPath + soulsSettingsFile, smtSettingText);
+        }
+
+        private void scanPOS0GapToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CommonOpenFileDialog goodFolderDialog = new CommonOpenFileDialog()
+            {
+                IsFolderPicker = true,
+                Title = "Select folder of cmshs",
+            };
+            if (goodFolderDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                StringBuilder sb = new StringBuilder();
+                Dictionary<int, List<(string fileName, byte[] gap)>> posGaps = new Dictionary<int, List<(string filename, byte[] gap)>>();
+
+                var files = Directory.EnumerateFiles(goodFolderDialog.FileName);
+
+                foreach (var file in files)
+                {
+                    var tuple = (Path.GetFileName(file), BluePointConvert.ReadFileTestVertDef(file).ToArray());
+                    var len = tuple.Item2.Length;
+                    if (posGaps.ContainsKey(len))
+                    {
+                        posGaps[len].Add(tuple);
+                    }
+                    else
+                    {
+                        posGaps[len] = new List<(string fileName, byte[] gap)>() { tuple };
+                    }
+                }
+
+                var keys = posGaps.Keys.ToList();
+                keys.Sort();
+
+                foreach (var key in keys)
+                {
+                    sb.Append("\n");
+                    sb.Append(key + "\n");
+                    var posGapSet = posGaps[key];
+                    posGapSet.Sort();
+                    foreach (var pair in posGapSet)
+                    {
+                        foreach (var bt in pair.gap)
+                        {
+                            sb.Append(bt.ToString("X"));
+                        }
+                        sb.Append($" {pair.fileName}");
+                        sb.Append("\n");
+                    }
+                }
+
+                File.WriteAllText(Path.Combine(goodFolderDialog.FileName, "cmshPosGaps.txt"), sb.ToString());
+            }
+        }
+
+        private void gatherMatchingCMSHNamesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var openFileDialog = new CommonOpenFileDialog()
+            {
+                Title = "Select Folder",
+                IsFolderPicker = true,
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                var baseDir = openFileDialog.FileName;
+                var files = Directory.GetFiles(baseDir, "*.cmsh", SearchOption.AllDirectories);
+
+                Dictionary<string, List<string>> paths = new Dictionary<string, List<string>>();
+                foreach (var file in files)
+                {
+                    string baseName = Path.GetFileName(file);
+                    string pathStr = baseName;
+
+                    BluePointConvert.ReadFileTest(file, out int start, out int flags, out int modelType);
+                    switch (start)
+                    {
+                        case 0x1100:
+                            pathStr += " CMSH_Ref_1100";
+                            break;
+                        case 0x5100:
+                            pathStr += " CMSH_Ref_5100";
+                            break;
+                        case 0x4901:
+                            pathStr += " CMSH_Ref_4901";
+                            break;
+                        case 0x4100:
+                            pathStr += " CMSH_Ref_41";
+                            break;
+                        case 0xAA01:
+                            pathStr += " DeSType_AA01";
+                            break;
+                        case 0x2A01:
+                            pathStr += " DeSType_2A01";
+                            break;
+                        case 0xA8C:
+                        case 0x68C:
+                            switch (modelType)
+                            {
+                                case 0x2:
+                                case 0xA:
+                                    break;
+                                case 0x5:
+                                    pathStr += " CMSH_Ref_5";
+                                    continue;
+                                case 0xD:
+                                    pathStr += " CMSH_Ref_D";
+                                    continue;
+                                case 0x15:
+                                    pathStr += " CMSH_Ref_15";
+                                    continue;
+                                default:
+                                    break;
+                            }
+
+                            switch (flags)
+                            {
+                                case 0x89:
+                                    pathStr += " Compact_89";
+                                    break;
+                                case 0x88:
+                                    pathStr += " Compact_88";
+                                    break;
+                                case 0x80:
+                                    pathStr += " NoInfo_80";
+                                    break;
+                                case 0x81:
+                                    pathStr += " NoInfo_81";
+                                    break;
+                                case 0x82:
+                                    pathStr += " DeSType_82";
+                                    break;
+                                default:
+                                    break;
+                            }
+                            break;
+                        case 0xACC:
+                            pathStr += " DeSType_ACC";
+                            break;
+                        case 0x200:
+                            pathStr += " DeSType_200";
+                            break;
+                        case 0x500:
+                            pathStr += " DeSType_500";
+                            break;
+                        case 0xA01:
+                            pathStr += " DeSType_A01";
+                            break;
+                        default:
+                            break;
+                    }
+
+                    if (paths.ContainsKey(baseName))
+                    {
+                        paths[baseName].Add(pathStr);
+                    }
+                    else
+                    {
+                        paths[baseName] = new List<string> { pathStr };
+                    }
+                }
+
+                StringBuilder txt = new StringBuilder();
+                foreach (var pathSet in paths)
+                {
+                    if (pathSet.Value.Count > 1)
+                    {
+                        txt.AppendLine(pathSet.Key);
+                        foreach (var path in pathSet.Value)
+                        {
+                            txt.AppendLine(path);
+                        }
+                        txt.AppendLine("");
+                    }
+                }
+
+                File.WriteAllText(Path.Combine(baseDir, "Matches.txt"), txt.ToString());
+            }
+        }
+
+        private void exportLuaToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select lua File",
+                Filter = "lua files|*.lua;*.evt;*.skit",
+                FileName = "",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                PSO2CompressedScripts scriptHandler = new PSO2CompressedScripts();
+
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    scriptHandler.ParseLooseScript(file);
+                    var ext = Path.GetExtension(file);
+                    scriptHandler.WriteText(file.Replace(ext, $".out{ext}"), Path.GetFileName(file));
+                }
+            }
+        }
+
+        private void readFCLToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select fcl File",
+                Filter = "fcl files|*.fcl",
+                FileName = "",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                foreach (var file in openFileDialog.FileNames)
+                {
+                    aquaUI.aqua.ReadFCL(file);
+                }
+            }
+        }
+
+        private void extractBorderBreakPS4FARCToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select Border Break archive file (Models rigging and skinning is broken at this time)",
+                Filter = "*_obj.bin, *.pfa, spr_*.bin, *tex.bin files|*_obj.bin;spr_*.bin;*tex.bin;*.pfa|Model archive files *_obj.bin|*_obj.bin|spr_*.bin, *tex.bin files|spr_*.bin;*tex.bin|pfa files|*.pfa",
+                FileName = "",
+                Multiselect = true
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                foreach (var archiveFile in openFileDialog.FileNames)
+                {
+                    if (archiveFile.EndsWith("pfa"))
+                    {
+                        using (Stream stream = new MemoryStream(File.ReadAllBytes(archiveFile)))
+                        using (var streamReader = new BufferedStreamReader(stream, 8192))
+                        {
+                            var pfa = new FARC(streamReader);
+                            var path = archiveFile + "_out";
+                            Directory.CreateDirectory(path);
+                            foreach (var file in pfa.fileEntries)
+                            {
+                                var fname = Path.Combine(path, file.fileName);
+                                File.WriteAllBytes(fname, file.fileData);
+
+                                //Extract txp
+                                if (file.fileName.StartsWith("spr_") || file.fileName.EndsWith("tex.bin"))
+                                {
+                                    ExtractTXP(fname, file.fileData);
+                                }
+                                else if (file.fileName.EndsWith("_obj.bin"))
+                                {
+                                    ConvertAM2BBPS4Model(fname, file.fileData);
+                                }
+                            }
+                        }
+                    }
+                    else if (archiveFile.EndsWith("_obj.bin"))
+                    {
+                        var objBinRaw = File.ReadAllBytes(archiveFile);
+                        ConvertAM2BBPS4Model(archiveFile, objBinRaw);
+                    }
+                    else
+                    {
+                        var txpRaw = File.ReadAllBytes(archiveFile);
+                        ExtractTXP(archiveFile, txpRaw);
+                    }
+                }
+            }
+        }
+
+        public static void ConvertEOBJ(string eobj, byte[] eobjRaw)
+        {
+            using (Stream stream = new MemoryStream(eobjRaw))
+            using (var streamReader = new BufferedStreamReader(stream, 8192))
+            {
+                new E_OBJ(streamReader);
+            }
+        }
+
+        private static void ExtractTXP(string txpArchive, byte[] txpRaw)
+        {
+            using (Stream stream = new MemoryStream(txpRaw))
+            using (var streamReader = new BufferedStreamReader(stream, 8192))
+            {
+                if (Path.GetFileName(txpArchive).StartsWith("spr_"))
+                {
+                    var int_00 = streamReader.Read<int>();
+                    var txpOffset = streamReader.Read<int>();
+                    streamReader.Seek(txpOffset, SeekOrigin.Begin);
+                }
+
+                //Standard TXP archive
+                var TXP = new TXP(streamReader);
+                var path = txpArchive + "_out";
+                Directory.CreateDirectory(path);
+                for (int i = 0; i < TXP.txp3.txp4List.Count; i++)
+                {
+                    string baseFname;
+                    if (TXP.txp3.txp4Names.Count > 0)
+                    {
+                        baseFname = TXP.txp3.txp4Names[i];
+                    }
+                    else
+                    {
+                        baseFname = Path.GetFileName(txpArchive) + $"_{i}";
+                    }
+                    var fname = Path.Combine(path, baseFname + ".dds");
+                    File.WriteAllBytes(fname, TXP.txp3.txp4List[i].GetDDS());
+                }
+            }
+        }
+
+        private void setMOTBONEbinPathToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog()
+            {
+                Title = "Select mot_bone.bin file",
+                Filter = "mot_bone.bin|mot_bone.bin",
+                FileName = "",
+            };
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                borderBreakPS4BonePath = openFileDialog.FileName;
+                SaveMainSettings();
+            }
+        }
+
+        private void SaveMainSettings()
+        {
+            MainSetting mainSetting = new MainSetting();
+            mainSetting.BBPS4BonePath = borderBreakPS4BonePath;
+
+            string mainSettingText = JsonConvert.SerializeObject(mainSetting, jss);
+            File.WriteAllText(mainSettingsPath + mainSettingsFile, mainSettingText);
+        }
+
+        private void ConvertAM2BBPS4Model(string eobjPath, byte[] eobjRaw)
+        {
+            List<AquaNode> borderBreakPS4Bones;
+            using (Stream stream = new MemoryStream(File.ReadAllBytes(borderBreakPS4BonePath)))
+            using (var streamReader = new BufferedStreamReader(stream, 8192))
+            {
+                borderBreakPS4Bones = BorderBreakPS4Convert.motBonesToAQN(new MOT_BONE(streamReader));
+                borderBreakPS4Bones.Add(AquaNode.GenerateBasicAQN());
+            }
+            List<NGSAquaObject> aqps;
+            E_OBJ eobj;
+            using (Stream stream = new MemoryStream(eobjRaw))
+            using (var streamReader = new BufferedStreamReader(stream, 8192))
+            {
+                eobj = new E_OBJ(streamReader);
+                aqps = BorderBreakPS4Convert.EOBJToAqua(eobj);
+            }
+
+            for (int i = 0; i < aqps.Count; i++)
+            {
+                AquaNode aqn;
+                var name = eobj.names[i];
+
+                if (name.Contains("_crw0"))
+                {
+                    aqn = borderBreakPS4Bones[0];
+                }
+                else if (name.Contains("_rba_"))
+                {
+                    aqn = borderBreakPS4Bones[1];
+                }
+                else if (name.Contains("_rbb_"))
+                {
+                    aqn = borderBreakPS4Bones[2];
+                }
+                else if (name.Contains("_rbc_"))
+                {
+                    aqn = borderBreakPS4Bones[3];
+                }
+                else if (name.Contains("_rbd_"))
+                {
+                    aqn = borderBreakPS4Bones[4];
+                }
+                else
+                {
+                    aqn = borderBreakPS4Bones[5];
+                }
+
+                aquaUI.aqua.aquaModels.Clear();
+                ModelSet set = new ModelSet();
+                set.models.Add(aqps[i]);
+                if (set.models[0] != null && set.models[0].vtxlList.Count > 0)
+                {
+                    aquaUI.aqua.aquaModels.Add(set);
+                    aquaUI.aqua.ConvertToNGSPSO2Mesh(false, false, false, true, false, false, false, true);
+                    set.models[0].ConvertToLegacyTypes();
+                    set.models[0].CreateTrueVertWeights();
+
+                    var path = eobjPath + "_out";
+                    Directory.CreateDirectory(path);
+                    var fname = Path.Combine(path, name + ".fbx");
+                    FbxExporter.ExportToFile(aquaUI.aqua.aquaModels[0].models[0], aqn, new List<AquaMotion>(), fname, new List<string>(), new List<Matrix4x4>(), false);
+                }
+
+            }
         }
     }
 }

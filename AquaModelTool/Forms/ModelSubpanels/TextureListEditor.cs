@@ -7,13 +7,13 @@ namespace AquaModelTool.Forms.ModelSubpanels
 {
     public partial class TextureListEditor : UserControl
     {
-        private AquaObject _aqp;
+        public AquaObject _aqp;
         private int texLimit = 0x10;
         public TextureListEditor(AquaObject aqp)
         {
             _aqp = aqp;
             InitializeComponent();
-            panel1.Controls.Add(new TextureReferenceEditor());
+            panel1.Controls.Add(new TextureReferenceEditor(this));
 
             //NGS models are allowed 
             //Note for NGS textures, texUsageOrder param is seemingly more of a type. In Classic PSO2 models, it's an actual order id. Unsure of importance, but may need study
@@ -37,30 +37,43 @@ namespace AquaModelTool.Forms.ModelSubpanels
 
         }
 
-        private void UpdateTSTAList()
+        public void UpdateTSTAList(int goToSlot = -1, bool doUpdateTstaEditor = true)
         {
             var currentTset = _aqp.tsetList[texListCB.SelectedIndex];
             texSlotCB.Items.Clear();
             for (int i = 0; i < currentTset.texCount; i++)
             {
-                if(currentTset.tstaTexIDs[i] != -1)
+                if (currentTset.tstaTexIDs[i] != -1)
                 {
                     texSlotCB.Items.Add($"TSTA ({currentTset.tstaTexIDs[i]}): " + _aqp.tstaList[currentTset.tstaTexIDs[i]].texName.GetString());
-                } else
+                }
+                else
                 {
                     texSlotCB.Items.Add("TSTA -1: Null");
                 }
             }
-            if(texSlotCB.Items.Count > 0)
+
+            if(doUpdateTstaEditor)
             {
-                texSlotCB.SelectedIndex = 0;
+                UpdateTSTAEditor();
             }
-            UpdateTSTAEditor();
+
+            if (goToSlot == -1)
+            {
+                if (texSlotCB.Items.Count > 0)
+                {
+                    texSlotCB.SelectedIndex = 0;
+                }
+            } else
+            {
+                texSlotCB.SelectedIndex = goToSlot;
+            }
         }
+
 
         private void UpdateTSTAEditor()
         {
-            ((TextureReferenceEditor)panel1.Controls[0]).UpdateTsta(_aqp.texfList, _aqp.tstaList, texSlotCB.SelectedIndex >= 0 ? _aqp.tsetList[texListCB.SelectedIndex].tstaTexIDs[texSlotCB.SelectedIndex] : -1);
+            ((TextureReferenceEditor)panel1.Controls[0]).UpdateTsta(_aqp.texfList, _aqp.tstaList, texSlotCB.SelectedIndex >= 0 ? _aqp.tsetList[texListCB.SelectedIndex].tstaTexIDs[texSlotCB.SelectedIndex] : -1, texSlotCB.SelectedIndex);
             panel1.Visible = true;
             panel1.Enabled = true;
         }
@@ -84,14 +97,16 @@ namespace AquaModelTool.Forms.ModelSubpanels
                 var texf = new AquaObject.TEXF();
                 texf.texName.SetString("sampleTex_d.dds");
                 _aqp.texfList.Add(texf);
+                _aqp.objc.texfCount++;
                 var tsta = TSTATypePresets.defaultPreset;
                 tsta.texName.SetString("sampleTex_d.dds");
                 _aqp.tstaList.Add(tsta);
+                _aqp.objc.tstaCount++;
 
                 _aqp.tsetList[texListCB.SelectedIndex].tstaTexIDs.Add(_aqp.tstaList.Count - 1);
                 _aqp.tsetList[texListCB.SelectedIndex].texCount = _aqp.tsetList[texListCB.SelectedIndex].tstaTexIDs.Count;
 
-                UpdateTSTAList();
+                UpdateTSTAList(texSlotCB.Items.Count);
             } else
             {
                 MessageBox.Show("Cannot add beyond texture set limit!");
@@ -105,14 +120,16 @@ namespace AquaModelTool.Forms.ModelSubpanels
                 var texf = new AquaObject.TEXF();
                 texf.texName.SetString("sampleTex_d.dds");
                 _aqp.texfList.Add(texf);
+                _aqp.objc.texfCount++;
                 var tsta = TSTATypePresets.defaultPreset;
                 tsta.texName.SetString("sampleTex_d.dds");
                 _aqp.tstaList.Add(tsta);
+                _aqp.objc.tstaCount++;
 
                 _aqp.tsetList[texListCB.SelectedIndex].tstaTexIDs.Insert(texSlotCB.SelectedIndex, _aqp.tstaList.Count - 1);
                 _aqp.tsetList[texListCB.SelectedIndex].texCount = _aqp.tsetList[texListCB.SelectedIndex].tstaTexIDs.Count;
 
-                UpdateTSTAList();
+                UpdateTSTAList(texSlotCB.SelectedIndex);
             }
             else
             {
@@ -144,7 +161,8 @@ namespace AquaModelTool.Forms.ModelSubpanels
                 {
                     int id = texSlotCB.SelectedIndex;
                     _aqp.tstaList.RemoveAt(texSlotCB.SelectedIndex);
-                    for(int i = 0; i < _aqp.tsetList.Count; i++)
+                    _aqp.objc.tstaCount--;
+                    for (int i = 0; i < _aqp.tsetList.Count; i++)
                     {
                         for(int t = 0; t < _aqp.tsetList[i].tstaTexIDs.Count; t++)
                         {
@@ -178,6 +196,7 @@ namespace AquaModelTool.Forms.ModelSubpanels
                         if(_aqp.texfList[i].texName == texName)
                         {
                             _aqp.texfList.RemoveAt(i);
+                            _aqp.objc.texfCount--;
                         }
                     }
                 }
@@ -193,6 +212,7 @@ namespace AquaModelTool.Forms.ModelSubpanels
         {
             var newSet = new AquaObject.TSET();
             _aqp.tsetList.Add(newSet);
+            _aqp.objc.tsetCount++;
             texListCB.Items.Add(texListCB.Items.Count);
         }
 
@@ -200,6 +220,7 @@ namespace AquaModelTool.Forms.ModelSubpanels
         {
             var newSet = new AquaObject.TSET();
             _aqp.tsetList.Insert(texListCB.SelectedIndex, newSet);
+            _aqp.objc.tsetCount++;
             var index = texListCB.SelectedIndex;
             texListCB.Items.Clear();
             for (int i = 0; i < _aqp.tsetList.Count; i++)
@@ -215,6 +236,7 @@ namespace AquaModelTool.Forms.ModelSubpanels
             int index = texListCB.SelectedIndex;
             var tset = _aqp.tsetList[index];
             _aqp.tsetList.RemoveAt(index);
+            _aqp.objc.tsetCount--;
             texListCB.Items.Clear();
             for (int i = 0; i < _aqp.tsetList.Count; i++)
             {

@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Windows;
-using AquaModelLibrary.Forms.CommonForms;
+using AquaModelLibrary.ToolUX.CommonForms;
 using System;
+using System.Diagnostics;
 
 namespace CMXPatcher
 {
@@ -290,6 +291,15 @@ namespace CMXPatcher
             {
                 MessageBox.Show("Please select a valid character creator benchmark pso2_bin path!");
             }
+        }
+
+        private void openModsFolder(object sender, RoutedEventArgs e)
+        {
+            patcher.OpenModsFolder();
+        }
+        private void openDumpsFolder(object sender, RoutedEventArgs e)
+        {
+            patcher.OpenDumpsFolder();
         }
     }
 }

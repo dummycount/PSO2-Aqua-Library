@@ -16,6 +16,7 @@ using AquaExtras;
 using System.ComponentModel;
 using System.Windows.Threading;
 using Zamboni.IceFileFormats;
+using System.Diagnostics;
 
 namespace CMXPatcher
 {
@@ -27,7 +28,7 @@ namespace CMXPatcher
         public string moddedCMXPath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) + "\\ModdedCMX\\";
         public string downgradeCMXPath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) + "\\BenchmarkCMX\\";
         public string modPath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) + "\\Mods\\";
-        public string pso2_binDir = null;
+        public string pso2_binDir;
         public IceFile cmxIce;
         public CharacterMakingIndex cmx;
         public byte[] cmxRaw; //Would be nice to reassemble these at some point, but it's it's a large format and it's easier to just edit a few things directly.
@@ -489,6 +490,27 @@ namespace CMXPatcher
             }
 
             return false;
+        }
+
+        public void OpenModsFolder()
+        {
+            Directory.CreateDirectory(modPath);
+
+            using Process process = new Process();
+            process.StartInfo.FileName = "explorer.exe";
+            process.StartInfo.Arguments = modPath;
+            process.Start();
+        }
+
+        public void OpenDumpsFolder()
+        {
+            string dump = settingsPath + "CMXEntryDumps\\";
+            Directory.CreateDirectory(dump);
+
+            using Process process = new Process();
+            process.StartInfo.FileName = "explorer.exe";
+            process.StartInfo.Arguments = dump;
+            process.Start();
         }
     }
 }
