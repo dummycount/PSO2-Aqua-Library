@@ -1817,9 +1817,10 @@ namespace AquaModelLibrary.Extra
                         if (sub.TryGetValue(i, out List<string> dict))
                         {
                             named = true;
-                            foreach (string str in dict)
+                            for (int j = 0; j < dict.Count && j < 2; j++)
                             {
-                                output += str + ",";
+                                string str = dict[j];
+                                output += Escape(str) + ",";
                             }
                         }
                         else
@@ -1830,7 +1831,7 @@ namespace AquaModelLibrary.Extra
                         //Account for lack of a name
                         if (named == false)
                         {
-                            output = $"[Unnamed {i}]" + output;
+                            output = $"[Unnamed {i}]," + output;
                         }
 
                         output += ToThree(i);
@@ -1877,9 +1878,9 @@ namespace AquaModelLibrary.Extra
                     }
 
 
-                    subMotions[cat].Insert(0, "Files are layed out as: NGSHumanfile NGSCastFile NGSCasealFile NGSFigFile\n" +
-                        "Substitute Motions are in win32reboot, unlike most NGS player files\n" +
-                        "The first two characters of each filename are the folder name\n\n");
+                    subMotions[cat].Insert(0, "JP Name,EN Name,id,Human Hash,Classic Cast Hash,Classic Caseal Hash,.fig Hash," +
+                        "Substitute Motions are in win32reboot, unlike most NGS player files. " +
+                        "The first two characters of each filename are the folder name\n");
 
                     WriteCSV(playerRAnimDirOut, $"SubstituteMotion{sub}.csv", subMotions[cat]);
                 }
@@ -1982,7 +1983,7 @@ namespace AquaModelLibrary.Extra
                         gender = "Female";
                     }
                     
-                    output = $"{names[0]},{names[1]},{lac.dataBlocks[i].chatCommand},{classic},{classicHash},{rebootHuman},{rebootHumanHash},{rebootCastMale},{rebootCastMaleHash},{rebootCastFemale},{rebootCastFemaleHash},{rebootF},{rebootFigHash},{vfx},{vfxHash},{rebootVfx},{rebootVfxHash},{gender}\n";
+                    output = $"{Escape(names[0])},{Escape(names[1])},{Escape(lac.dataBlocks[i].chatCommand)},{classic},{classicHash},{rebootHuman},{rebootHumanHash},{rebootCastMale},{rebootCastMaleHash},{rebootCastFemale},{rebootCastFemaleHash},{rebootF},{rebootFigHash},{vfx},{vfxHash},{rebootVfx},{rebootVfxHash},{gender}\n";
 
                     lobbyActions.Append(output);
                 }
@@ -2084,7 +2085,7 @@ namespace AquaModelLibrary.Extra
                             gender = "Female";
                         }
 
-                        string output = $"{names[0]},{names[1]},{reLac.rebootDataBlocks[i].chatCommand},{rebootHuman},{rebootHumanHash},{rebootCastMale},{rebootCastMaleHash},{rebootCastFemale},{rebootCastFemaleHash},{rebootF},{rebootFigHash},{rebootVfx},{rebootVfxHash},{gender}\n";
+                        string output = $"{Escape(names[0])},{Escape(names[1])},{Escape(reLac.rebootDataBlocks[i].chatCommand)},{rebootHuman},{rebootHumanHash},{rebootCastMale},{rebootCastMaleHash},{rebootCastFemale},{rebootCastFemaleHash},{rebootF},{rebootFigHash},{rebootVfx},{rebootVfxHash},{gender}\n";
 
                         lobbyActionsReboot.Append(output);
                     }
