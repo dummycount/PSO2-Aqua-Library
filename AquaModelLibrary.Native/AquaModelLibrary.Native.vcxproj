@@ -185,8 +185,9 @@
     <PostBuildEvent>
       <Command>
         mkdir "$(ProjectDir)..\AquaModelTool\bin\Debug"
+        mkdir "$(ProjectDir)..\SoulsModelTool\bin\Debug"
         copy /Y "$(TargetDir)$(ProjectName).x64.dll" "$(ProjectDir)..\AquaModelTool\bin\Debug\$(ProjectName).x64.dll"
-        copy /Y "$(TargetDir)$(ProjectName).x64.dll" "$(SolutionDir)SoulsModelTool\bin\Debug\$(ProjectName).x64.dll"
+        copy /Y "$(TargetDir)$(ProjectName).x64.dll" "$(ProjectDir)..\SoulsModelTool\bin\Debug\$(ProjectName).x64.dll"
       </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -215,8 +216,9 @@
     <PostBuildEvent>
       <Command>
         mkdir "$(ProjectDir)..\AquaModelTool\bin\Release"
+        mkdir "$(ProjectDir)..\SoulsModelTool\bin\Release"
         copy /Y "$(TargetDir)$(ProjectName).x64.dll" "$(ProjectDir)..\AquaModelTool\bin\Release\$(ProjectName).x64.dll"
-        copy /Y "$(TargetDir)$(ProjectName).x64.dll" "$(SolutionDir)SoulsModelTool\bin\Release\$(ProjectName).x64.dll"
+        copy /Y "$(TargetDir)$(ProjectName).x64.dll" "$(ProjectDir)..\SoulsModelTool\bin\Release\$(ProjectName).x64.dll"
       </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
