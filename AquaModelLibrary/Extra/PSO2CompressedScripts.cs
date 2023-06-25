@@ -74,7 +74,7 @@ namespace AquaModelLibrary.Extra
 
         public void ParseScripts(string filePath)
         {
-            var refText = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().GetName().CodeBase).Substring(6), txtFile);
+            var refText = Path.Combine(AppContext.BaseDirectory, txtFile);
 
             //Get name references if they exist
             if (File.Exists(refText))
