@@ -2359,7 +2359,6 @@ namespace AquaModelLibrary.Extra
             outputCasealBody.AppendLine(partColumns);
             outputOuterMale.AppendLine(partColumns);
             outputOuterFemale.AppendLine(partColumns);
-            outputCostumeMale.AppendLine(partColumns);
             outputNGSOuterMale.AppendLine(partColumns);
             outputNGSOuterFemale.AppendLine(partColumns);
             outputNGSCastBody.AppendLine(partColumns);
@@ -3805,7 +3804,7 @@ namespace AquaModelLibrary.Extra
                     if (dict.TryGetValue(id, out string str) && str != null && str != "" && str.Length > 0)
                     {
                         named = true;
-                        output += str + ",";
+                        output += Escape(str) + ",";
                     }
                     else
                     {
