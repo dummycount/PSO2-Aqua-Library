@@ -126,9 +126,8 @@ namespace AquaModelLibrary.Extra.Ninja.BillyHatcher
         {
             MC2 mc2 = new MC2();
             var scene = ModelImporter.GetAssimpScene(initialFilePath, Assimp.PostProcessSteps.Triangulate | Assimp.PostProcessSteps.JoinIdenticalVertices | Assimp.PostProcessSteps.FlipUVs);
-            var baseScale = ModelImporter.SetAssimpScale(scene);
 
-            Vector3 rootBoxMinExtents = new Vector3(scene.Meshes[0].Vertices[0].X, scene.Meshes[0].Vertices[0].Y, scene.Meshes[0].Vertices[0].Z) * baseScale;
+            Vector3 rootBoxMinExtents = new Vector3(scene.Meshes[0].Vertices[0].X, scene.Meshes[0].Vertices[0].Y, scene.Meshes[0].Vertices[0].Z);
             Vector3 rootBoxMaxExtents = rootBoxMinExtents;
             for (int i = 0; i < scene.MeshCount; i++)
             {
@@ -137,7 +136,7 @@ namespace AquaModelLibrary.Extra.Ninja.BillyHatcher
 
                 for (int v = 0; v < mesh.VertexCount; v++)
                 {
-                    var vert = mesh.Vertices[v] * baseScale;
+                    var vert = mesh.Vertices[v];
 
                     //Min extents
                     if (rootBoxMinExtents.X > vert.X)
@@ -175,7 +174,7 @@ namespace AquaModelLibrary.Extra.Ninja.BillyHatcher
                     if (!foundDuplicateVert)
                     {
                         vertIndexRemapper.Add(v, mc2.vertPositions.Count);
-                        mc2.vertPositions.Add(vertData);
+                        mc2.vertPositions.Add(new Vector3(vert.X, vert.Y, vert.Z));
                     }
                 }
 

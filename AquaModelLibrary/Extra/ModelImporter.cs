@@ -5,21 +5,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using static AquaModelLibrary.AquaObjectMethods;
 using static AquaModelLibrary.Extra.MathExtras;
 
 namespace AquaModelLibrary
 {
     public class ModelImporter
     {
-        public enum ScaleHandling
-        {
-            NoScaling = 0,
-            FileScaling = 1,
-            CustomScale = 2,
-        }
-        public static ScaleHandling scaleHandling = ScaleHandling.NoScaling;
-        public static double customScale = 1;
-
         public static Dictionary<char, char> illegalChars = new Dictionary<char, char>() {
             { '<', '[' },
             { '>', ']'},
@@ -81,15 +73,15 @@ namespace AquaModelLibrary
             return aiScene;
         }
 
-        public static AquaMotion AssimpAQMConvertNoNameSingle(string initialFilePath, bool forceNoPlayerExport, bool useScaleFrames)
+        public static AquaMotion AssimpAQMConvertNoNameSingle(string initialFilePath, bool forceNoPlayerExport, bool useScaleFrames, float scaleFactor)
         {
-            var animSet = AssimpAQMConvertNoNames(initialFilePath, forceNoPlayerExport, useScaleFrames);
+            var animSet = AssimpAQMConvertNoNames(initialFilePath, forceNoPlayerExport, useScaleFrames, scaleFactor);
             return animSet != null && animSet.Count > 0 ? animSet[0] : null;
         }
 
-        public static List<AquaMotion> AssimpAQMConvertNoNames(string initialFilePath, bool forceNoPlayerExport, bool useScaleFrames)
+        public static List<AquaMotion> AssimpAQMConvertNoNames(string initialFilePath, bool forceNoPlayerExport, bool useScaleFrames, float scaleFactor)
         {
-            var list = AssimpAQMConvert(initialFilePath, forceNoPlayerExport, useScaleFrames);
+            var list = AssimpAQMConvert(initialFilePath, forceNoPlayerExport, useScaleFrames, scaleFactor);
             List<AquaMotion> animList = new List<AquaMotion>();
             foreach(var pair in list)
             {
@@ -99,13 +91,24 @@ namespace AquaModelLibrary
             return animList;
         }
 
-        public static List<(string fileName, AquaMotion aqm)> AssimpAQMConvert(string initialFilePath, bool forceNoPlayerExport, bool useScaleFrames)
+        public static List<(string fileName, AquaMotion aqm)> AssimpAQMConvert(string initialFilePath, bool forceNoPlayerExport, bool useScaleFrames, float scaleFactor)
         {
             Assimp.AssimpContext context = new Assimp.AssimpContext();
             context.SetConfig(new Assimp.Configs.FBXPreservePivotsConfig(true));
             Assimp.Scene aiScene = context.ImportFile(initialFilePath, Assimp.PostProcessSteps.Triangulate | Assimp.PostProcessSteps.JoinIdenticalVertices | Assimp.PostProcessSteps.FlipUVs);
-
-            float baseScale = SetAssimpScale(aiScene);
+            /*
+            double scale = 100;
+            float orgScale = 100;
+            if (aiScene.Metadata.ContainsKey("UnitScaleFactor"))
+            {
+                scale = (double)aiScene.Metadata["UnitScaleFactor"].Data;
+            }
+            if (aiScene.Metadata.ContainsKey("OriginalUnitScaleFactor"))
+            {
+                orgScale = (float)aiScene.Metadata["OriginalUnitScaleFactor"].Data;
+            }
+            float baseScale = (float)(scale / 100.0);*/
+            float baseScale = 1;
 
             bool playerExport = aiScene.RootNode.Children[0].Name.Contains("pl_");
             if (playerExport && forceNoPlayerExport)
@@ -519,9 +522,9 @@ namespace AquaModelLibrary
             }
         }
 
-        public static void AssimpAQMConvertAndWrite(string initialFilePath, bool forceNoPlayerExport, bool useScaleFrames)
+        public static void AssimpAQMConvertAndWrite(string initialFilePath, bool forceNoPlayerExport, bool useScaleFrames, float scaleFactor)
         {
-            WriteMotions(initialFilePath, AssimpAQMConvert(initialFilePath, forceNoPlayerExport, useScaleFrames));
+            WriteMotions(initialFilePath, AssimpAQMConvert(initialFilePath, forceNoPlayerExport, useScaleFrames, scaleFactor));
         }
 
         private static void AddOneScaleFrame(bool useScaleFrames, AquaMotion.KeyData node, bool add0x80 = false, Assimp.Node aiNode = null)
@@ -580,7 +583,12 @@ namespace AquaModelLibrary
             node.keyData.Add(posKeys);
         }
 
-        private static int GetNodeNumber(string name)
+        public static string FilterAnimatedNodeName(string name)
+        {
+            return name.Substring(name.IndexOf(')') + 1);
+        }
+
+        public static int GetNodeNumber(string name)
         {
             var nameArr = name.Split('(');
             if (nameArr.Length == 1)
@@ -604,7 +612,7 @@ namespace AquaModelLibrary
             }
         }
 
-        private static Dictionary<int, Assimp.Node> GetAnimatedNodes(Assimp.Scene aiScene)
+        public static Dictionary<int, Assimp.Node> GetAnimatedNodes(Assimp.Scene aiScene)
         {
             Dictionary<int, Assimp.Node> nodes = new Dictionary<int, Assimp.Node>();
 
@@ -616,7 +624,7 @@ namespace AquaModelLibrary
             return nodes;
         }
 
-        private static void CollectAnimated(Assimp.Node node, Dictionary<int, Assimp.Node> nodes)
+        public static void CollectAnimated(Assimp.Node node, Dictionary<int, Assimp.Node> nodes)
         {
             //Be extra sure that this isn't an effect node
             if (IsAnimatedNode(node, out string name, out int num))
@@ -632,7 +640,7 @@ namespace AquaModelLibrary
         }
 
         //Check if a node is an animated by node by checking if it has the numbering formatting and is NOT marked as an effect node. Output name 
-        private static bool IsAnimatedNode(Assimp.Node node, out string name, out int num)
+        public static bool IsAnimatedNode(Assimp.Node node, out string name, out int num)
         {
             bool isNumbered = IsNumberedAnimated(node, out name, out num);
             return isNumbered && !node.Name.Contains("#Eff");
@@ -661,8 +669,19 @@ namespace AquaModelLibrary
             Assimp.AssimpContext context = new Assimp.AssimpContext();
             context.SetConfig(new Assimp.Configs.FBXPreservePivotsConfig(true));
             Assimp.Scene aiScene = context.ImportFile(initialFilePath, Assimp.PostProcessSteps.Triangulate | Assimp.PostProcessSteps.JoinIdenticalVertices | Assimp.PostProcessSteps.FlipUVs);
-
-            float baseScale = SetAssimpScale(aiScene);
+            float baseScale = 1;
+            /*
+            double scale = 100;
+            float orgScale = 100;
+            if (aiScene.Metadata.ContainsKey("UnitScaleFactor"))
+            {
+                scale = (double)aiScene.Metadata["UnitScaleFactor"].Data;
+            }
+            if (aiScene.Metadata.ContainsKey("OriginalUnitScaleFactor"))
+            {
+                orgScale = (float)aiScene.Metadata["OriginalUnitScaleFactor"].Data;
+            }
+            float baseScale = (float)(scale / 100.0);*/
 
             PRMModel prm = new PRMModel();
 
@@ -769,8 +788,15 @@ namespace AquaModelLibrary
             context.SetConfig(new Assimp.Configs.FBXPreservePivotsConfig(true));
             Assimp.Scene aiScene = context.ImportFile(initialFilePath, Assimp.PostProcessSteps.Triangulate | Assimp.PostProcessSteps.JoinIdenticalVertices | Assimp.PostProcessSteps.FlipUVs);
 
-            float baseScale = SetAssimpScale(aiScene);
-
+            float baseScale = 1;
+            /*
+            double scale = 100;
+            double unitScaleFactor = 1;
+            if (aiScene.Metadata.ContainsKey("UnitScaleFactor"))
+            {
+                unitScaleFactor = (double)aiScene.Metadata["UnitScaleFactor"].Data;
+            }
+            float baseScale = (float)(scale / unitScaleFactor);*/
             AquaObject aqp;
             aqn = new AquaNode();
             if (isNGS)
@@ -857,30 +883,6 @@ namespace AquaModelLibrary
             //AQPs created this way will require more processing to finish.
             //-Texture lists in particular, MUST be generated as what exists is not valid without serious errors
             return aquaUtil.aquaModels[0].models[0];
-        }
-
-        public static float SetAssimpScale(Assimp.Scene aiScene)
-        {
-            float baseScale = 1;
-            switch (scaleHandling)
-            {
-                case ScaleHandling.CustomScale:
-                    baseScale = (float)(1 / customScale);
-                    break;
-                case ScaleHandling.FileScaling:
-                    double unitScaleFactor = 1;
-                    if (aiScene.Metadata.ContainsKey("UnitScaleFactor"))
-                    {
-                        unitScaleFactor = (double)aiScene.Metadata["UnitScaleFactor"].Data;
-                    }
-                    baseScale = (float)(1.0 / unitScaleFactor);
-                    break;
-                case ScaleHandling.NoScaling:
-                default:
-                    break;
-            }
-
-            return baseScale;
         }
 
         private static Assimp.Node GetRootNode(Assimp.Node aiNode)
@@ -1073,7 +1075,7 @@ namespace AquaModelLibrary
             }
         }
 
-        private static void AddAiMeshToAQP(AquaObject aqp, Assimp.Mesh mesh, Matrix4x4 nodeMat, float baseScale, Dictionary<string, int> boneDict)
+        public static void AddAiMeshToAQP(AquaObject aqp, Assimp.Mesh mesh, Matrix4x4 nodeMat, float baseScale, Dictionary<string, int> boneDict)
         {
             AquaObject.GenericTriangles genTris = new AquaObject.GenericTriangles();
             genTris.name = mesh.Name;
@@ -1198,7 +1200,7 @@ namespace AquaModelLibrary
             aqp.tempTris.Add(genTris);
         }
 
-        private static List<int> GetMeshIds(string name)
+        public static List<int> GetMeshIds(string name)
         {
             if(name.Length < 6)
             {
@@ -1226,7 +1228,20 @@ namespace AquaModelLibrary
             return ids;
         }
 
-        private static void ParseShorts(string nodeName, out ushort boneShort1, out ushort boneShort2)
+        public static Assimp.Matrix4x4 GetWorldMatrix(Assimp.Node node)
+        {
+            var mat = node.Transform;
+            var currNode = node;
+            while (currNode.Parent != null)
+            {
+                mat *= currNode.Parent.Transform;
+                currNode = currNode.Parent;
+            }
+
+            return mat;
+        }
+
+        public static void ParseShorts(string nodeName, out ushort boneShort1, out ushort boneShort2)
         {
             boneShort1 = 0x1C0;
             boneShort2 = 0;
@@ -1256,7 +1271,7 @@ namespace AquaModelLibrary
             }
         }
 
-        private static bool ParseNodeId(string nodeName, out string nodeNameSeparated, out int id)
+        public static bool ParseNodeId(string nodeName, out string nodeNameSeparated, out int id)
         {
             nodeNameSeparated = nodeName;
             var numParse = nodeName.Split('(', ')');
@@ -1288,7 +1303,7 @@ namespace AquaModelLibrary
             return ToNumericsTransposed(transform);
         }
 
-        private static Matrix4x4 ToNumericsTransposed(Assimp.Matrix4x4 value)
+        public static Matrix4x4 ToNumericsTransposed(Assimp.Matrix4x4 value)
         {
             return new Matrix4x4(
                 value.A1, value.B1, value.C1, value.D1,
@@ -1298,14 +1313,14 @@ namespace AquaModelLibrary
         }
 
 
-        private static Matrix4x4 GetMat4FromAssimpMat4(Assimp.Matrix4x4 mat4)
+        public static Matrix4x4 GetMat4FromAssimpMat4(Assimp.Matrix4x4 mat4)
         {
             return new Matrix4x4(mat4.A1, mat4.A2, mat4.A3, mat4.A4,
                                  mat4.B1, mat4.B2, mat4.B3, mat4.B4,
                                  mat4.C1, mat4.C2, mat4.C3, mat4.C4,
                                  mat4.D1, mat4.D2, mat4.D3, mat4.D4);
         }
-        private static Matrix4x4 SwapRow4Column4Mat4(Matrix4x4 mat4)
+        public static Matrix4x4 SwapRow4Column4Mat4(Matrix4x4 mat4)
         {
             return new Matrix4x4(mat4.M11, mat4.M12, mat4.M13, mat4.M41,
                                 mat4.M21, mat4.M22, mat4.M23, mat4.M42,
