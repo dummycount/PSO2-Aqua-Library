@@ -168,6 +168,11 @@ namespace SoulsFormats
                             for (int i = 0; i < 4; i++)
                                 BoneIndices[i] = br.ReadUInt16();
                         }
+                        else if (member.Type == LayoutType.Short2toFloat2)
+                        {
+                            for (int i = 0; i < 4; i++)
+                                BoneIndices[i] = br.ReadByte(); // Short2toFloat2 Byte Type Read Guess
+                        }
                         else if (member.Type == LayoutType.Byte4E)
                         {
                             for (int i = 0; i < 4; i++)
@@ -263,7 +268,8 @@ namespace SoulsFormats
                         }
                         else if (member.Type == LayoutType.Byte4C)
                         {
-                            UVs.Add(new Vector3(br.ReadInt16(), br.ReadInt16(), 0) / uvFactor);
+                            UVs.Add(new Vector3(br.ReadByte() / 255f, br.ReadByte() / 255f, br.ReadByte() / 255f));
+                            br.AssertByte(0);
                         }
                         else if (member.Type == LayoutType.UV)
                         {
@@ -522,7 +528,12 @@ namespace SoulsFormats
                     }
                     else if (member.Semantic == LayoutSemantic.UV)
                     {
-                        Vector3 uv = uvQueue.Dequeue() * uvFactor;
+                        Vector3 uv = uvQueue.Dequeue();
+                        if(member.Type != LayoutType.Byte4C)
+                        {
+                            uv *= uvFactor;
+                        }
+
                         if (member.Type == LayoutType.Float2)
                         {
                             bw.WriteSingle(uv.X);
@@ -558,8 +569,10 @@ namespace SoulsFormats
                         }
                         else if (member.Type == LayoutType.Byte4C)
                         {
-                            bw.WriteInt16((short)Math.Round(uv.X));
-                            bw.WriteInt16((short)Math.Round(uv.Y));
+                            bw.WriteByte((byte)Math.Round(uv.X * 255f));
+                            bw.WriteByte((byte)Math.Round(uv.Y * 255f));
+                            bw.WriteByte((byte)Math.Round(uv.Z * 255f));
+                            bw.WriteByte(0);
                         }
                         else if (member.Type == LayoutType.UV)
                         {

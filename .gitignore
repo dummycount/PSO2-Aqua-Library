@@ -379,3 +379,12 @@ WeaponInstaller/bin/Release/net5.0-windows/ZomboniLib.pdb
 WeaponInstaller/obj/
 WeaponInstaller/obj/Debug/net5.0-windows/
 x64/
+build/
+
+AquaModelLibrary.Extensions/bin/
+
+AquaModelLibrary.Data/bin/
+
+AquaModelLibrary.Core/bin/
+
+AquaModelLibrary.Helpers/bin/
