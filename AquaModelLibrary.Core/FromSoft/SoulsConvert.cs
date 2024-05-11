@@ -26,7 +26,7 @@ namespace AquaModelLibrary.Core.FromSoft
         public static bool transformMesh = false;
         public static bool extractUnreferencedMapData = false;
         public static bool separateMSBDumpByModel = false;
-        public static bool addRootNodeLikeBlenderSmdImport = true;
+        public static bool addRootNodeLikeBlenderSmdImport = false;
         public static bool doNotAdjustRootRotation = false;
 
         public static SoulsGame game = SoulsGame.None;
@@ -278,9 +278,9 @@ namespace AquaModelLibrary.Core.FromSoft
         {
             byte[] newFile = file;
 
-            if (SoulsFormats.DCX.Is(file))
+            if (SoulsFormats.DCX.Is(newFile))
             {
-                newFile = DCX.Decompress(file);
+                newFile = DCX.Decompress(newFile);
             }
 
             IBinder files = null;

@@ -521,6 +521,7 @@
             { 544, ",Saxophone?"},
             { 545, ",Bass instrument?"},
             { 547, "エヴォルイクリスソード,Evoleclipse Sword"},
+            { 567, "コルボ・ラルースRe-Lソード,Xover Laluz Re-L Sword"},
             { 999, "デバッグウェポン,Debug Weapon"},
         };
 
@@ -1403,6 +1404,7 @@
             { 535, "ダガー, Daggers"},
             { 536, "レネッサダガー,Renaissa Daggers"},
             { 538, "エヴォルイクリスダガー,Evoleclipse Daggers"},
+            { 553, "コルボ・ラルースRe-Lダガー,Xover Laluz Re-L Daggers"},
             { 999, "デバッグウェポン,Debug Weapon"},
         };
 
@@ -2282,6 +2284,7 @@
             { 328, "＊ラトナスノビーレ,* Latonas Nobire"},
             { 329, "＊A.I.Sヴェガアームズ,* AIS Vega Arms"},
             { 330, "＊シュリフトビルデン,* Schrift Bilden"},
+            { 533, "コルボ・フェニックスRe-Aスラッシュ,Xover Phoenix Re-A Gunblade"},
             { 999, "デバッグウェポン,Debug Weapon"},
         };
 
