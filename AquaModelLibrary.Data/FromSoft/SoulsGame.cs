@@ -12,6 +12,5 @@
         EldenRing = 6,
         ArmoredCore6 = 7,
         DarkSouls1Remastered = 8,
-        EldenRingNightreign = 9,
     }
 }
