@@ -1,7 +1,6 @@
 ﻿using AquaModelLibrary.Data.BillyHatcher.LNDH;
-using AquaModelLibrary.Data.Capcom.MonsterHunter;
 using AquaModelLibrary.Data.Ninja;
-using AquaModelLibrary.Helpers.Extensions;
+using AquaModelLibrary.Helpers.Writers;
 using AquaModelLibrary.Helpers.Readers;
 using ArchiveLib;
 using System.Text;
@@ -88,20 +87,20 @@ namespace AquaModelLibrary.Data.BillyHatcher.ARCData
                 {
                     ARCLNDAnimatedMeshRefSet set = new ARCLNDAnimatedMeshRefSet();
                     set.modelOffset = sr.ReadBE<int>();
-                    set.motionOffset = sr.ReadBE<int>();
-                    set.MPLAnimId = sr.ReadBE<int>();
+                    set.altVertColorsOffset = sr.ReadBE<int>();
+                    set.MPLAnimKey = sr.ReadBE<int>();
                     protoLND.arcLndAnimatedModelRefs.Add(set);
                 }
                 foreach (var set in protoLND.arcLndAnimatedModelRefs)
                 {
                     ARCLNDAnimatedMeshData meshData = new ARCLNDAnimatedMeshData();
-                    meshData.MPLAnimId = set.MPLAnimId;
+                    meshData.MPLAnimKey = set.MPLAnimKey;
                     sr.Seek(0x20 + set.modelOffset, SeekOrigin.Begin);
                     meshData.model = protoLND.ReadArcLndModel(sr, true);
-                    if (set.motionOffset != 0)
+                    if (set.altVertColorsOffset != 0)
                     {
-                        sr.Seek(0x20 + set.motionOffset, SeekOrigin.Begin);
-                        meshData.motion = new Motion(sr, 0x20);
+                        sr.Seek(0x20 + set.altVertColorsOffset, SeekOrigin.Begin);
+                        meshData.altVertColors = new Motion(sr, 0x20);
                     }
                     protoLND.arcLndAnimatedMeshDataList.Add(meshData);
                 }
@@ -114,8 +113,7 @@ namespace AquaModelLibrary.Data.BillyHatcher.ARCData
 
         public byte[] GetBytes()
         {
-            ByteListExtension.AddAsBigEndian = true;
-            List<byte> outBytes = new List<byte>();
+            var outBytes = new ByteListWriter() { AddAsBigEndian = true };
             List<int> offsets = new List<int>()
             {
                 outBytes.Count,
@@ -181,7 +179,7 @@ namespace AquaModelLibrary.Data.BillyHatcher.ARCData
                     outBytes.ReserveInt($"AnimatedModel{i}");
                     offsets.Add(outBytes.Count + 0x20);
                     outBytes.ReserveInt($"AnimatedMotion{i}");
-                    outBytes.AddValue(protoLND.arcLndAnimatedMeshDataList[i].MPLAnimId);
+                    outBytes.AddValue(protoLND.arcLndAnimatedMeshDataList[i].MPLAnimKey);
                 }
                 outBytes.AlignWriter(0x20);
                 for (int i = 0; i < protoLND.arcLndAnimatedMeshDataList.Count; i++)
@@ -190,7 +188,7 @@ namespace AquaModelLibrary.Data.BillyHatcher.ARCData
                     outBytes.AddRange(protoLND.arcLndAnimatedMeshDataList[i].model.GetBytes(outBytes.Count + 0x20, new List<ARCLNDAnimatedMeshData>(), out var animModelOffsets));
                     offsets.AddRange(animModelOffsets);
                     outBytes.FillInt($"AnimatedMotion{i}", outBytes.Count + 0x20);
-                    outBytes.AddRange(protoLND.arcLndAnimatedMeshDataList[i].motion.GetBytes(outBytes.Count + 0x20, out var animOffsets));
+                    outBytes.AddRange(protoLND.arcLndAnimatedMeshDataList[i].altVertColors.GetBytes(outBytes.Count + 0x20, out var animOffsets));
                     offsets.AddRange(animOffsets);
                     outBytes.AlignWriter(0x20);
                 }
@@ -233,7 +231,7 @@ namespace AquaModelLibrary.Data.BillyHatcher.ARCData
             int pof0Size = pof0End - pof0Offset;
 
             //ARC Header (insert at the end to make less messy)
-            List<byte> arcHead = new List<byte>();
+            var arcHead = new ByteListWriter() { AddAsBigEndian = true };
             arcHead.AddValue(outBytes.Count + 0x20);
             arcHead.AddValue(pof0Offset);
             arcHead.AddValue(pof0Size);
@@ -248,7 +246,6 @@ namespace AquaModelLibrary.Data.BillyHatcher.ARCData
             arcHead.AddValue(0);
             outBytes.InsertRange(0, arcHead);
 
-            ByteListExtension.Reset();
             return outBytes.ToArray();
         }
     }

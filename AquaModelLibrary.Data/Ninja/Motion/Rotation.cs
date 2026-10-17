@@ -1,7 +1,8 @@
-﻿using AquaModelLibrary.Helpers.Extensions;
+﻿using AquaModelLibrary.Helpers.Writers;
 using AquaModelLibrary.Helpers.Readers;
 using System.ComponentModel;
 using System.Globalization;
+using System.Numerics;
 
 //From SA Tools
 namespace AquaModelLibrary.Data.Ninja.Motion
@@ -70,6 +71,13 @@ namespace AquaModelLibrary.Data.Ninja.Motion
         {
         }
 
+        public Rotation(Vector3 vec3)
+        {
+            XDeg = vec3.X;
+            YDeg = vec3.Y;
+            ZDeg = vec3.Z;
+        }
+
         public Rotation(BufferedStreamReaderBE<MemoryStream> sr)
         {
             X = sr.ReadBE<int>();
@@ -94,8 +102,8 @@ namespace AquaModelLibrary.Data.Ninja.Motion
 
         public byte[] GetBytes(bool bigEndian)
         {
-            List<byte> result = new List<byte>();
-            ByteListExtension.AddAsBigEndian = bigEndian;
+            var result = new ByteListWriter();
+            result.AddAsBigEndian = bigEndian;
             result.AddValue(X);
             result.AddValue(Y);
             result.AddValue(Z);

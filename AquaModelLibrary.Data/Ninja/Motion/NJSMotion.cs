@@ -1,6 +1,5 @@
-﻿using AquaModelLibrary.Helpers.Extensions;
+﻿using AquaModelLibrary.Helpers.Writers;
 using AquaModelLibrary.Helpers.Readers;
-using System.Diagnostics;
 using System.Numerics;
 
 //Addapted from SA Tools
@@ -162,7 +161,7 @@ namespace AquaModelLibrary.Data.Ninja.Motion
         public bool BillyMode = false;
         public int frameCount = 0;
         public AnimFlags animType = 0;
-        public InterpolationMode interpoMode = 0;
+        public NJD_MTYPE_FN interpoMode = 0;
         public List<AnimModelData> KeyDataList = new List<AnimModelData>();
 
         public NJSMotion() { }
@@ -190,8 +189,7 @@ namespace AquaModelLibrary.Data.Ninja.Motion
 
         public byte[] GetBytesNJM(bool writeBE, MotionWriteMode writeMode)
         {
-            ByteListExtension.AddAsBigEndian = writeBE;
-            List<byte> outBytes = new List<byte>();
+            var outBytes = new ByteListWriter() { AddAsBigEndian = writeBE };
             List<int> pofSets = new List<int>();
 
             Write(outBytes, pofSets, writeMode);
@@ -204,21 +202,27 @@ namespace AquaModelLibrary.Data.Ninja.Motion
             return outBytes.ToArray();
         }
 
-        public void Write(List<byte> outBytes, List<int> POF0Offsets, MotionWriteMode writeMode)
+        public void Write(ByteListWriter outBytes, List<int> POF0Offsets, MotionWriteMode writeMode)
         {
             POF0Offsets.Add(outBytes.Count);
             outBytes.ReserveInt("MotionStart");
             outBytes.AddValue(frameCount);
 
             AnimFlags flags = new AnimFlags();
-            List<AnimFlags> keyDataAnimFlagsList = new List<AnimFlags>();
-            foreach (var data in KeyDataList)
+            if(animType == 0)
             {
-                var dataFlags = data.GetAnimFlags(writeMode == MotionWriteMode.BillyMode, animType);
-                flags |= dataFlags;
-                keyDataAnimFlagsList.Add(dataFlags);
-            }
+                List<AnimFlags> keyDataAnimFlagsList = new List<AnimFlags>();
+                foreach (var data in KeyDataList)
+                {
+                    var dataFlags = data.GetAnimFlags(writeMode == MotionWriteMode.BillyMode, animType);
+                    flags |= dataFlags;
+                    keyDataAnimFlagsList.Add(dataFlags);
+                }
 
+            } else
+            {
+                flags = animType;
+            }
             ushort dataCount = 0;
             foreach (AnimFlags flag in Enum.GetValues(typeof(AnimFlags)))
             {
@@ -495,7 +499,7 @@ namespace AquaModelLibrary.Data.Ninja.Motion
                             foreach (var set in data.Spot)
                             {
                                 outBytes.AddValue(set.Key);
-                                outBytes.AddRange(set.Value.GetBytes(ByteListExtension.AddAsBigEndian));
+                                outBytes.AddRange(set.Value.GetBytes(outBytes.AddAsBigEndian));
                             }
                             break;
                         case AnimFlags.Point:
@@ -567,18 +571,7 @@ namespace AquaModelLibrary.Data.Ninja.Motion
             }
 
             var interpolationFrameSizeCombo = sr.ReadBE<ushort>();
-            switch ((NJD_MTYPE_FN)interpolationFrameSizeCombo & NJD_MTYPE_FN.NJD_MTYPE_MASK)
-            {
-                case NJD_MTYPE_FN.NJD_MTYPE_LINER:
-                    interpoMode = InterpolationMode.Linear;
-                    break;
-                case NJD_MTYPE_FN.NJD_MTYPE_SPLINE:
-                    interpoMode = InterpolationMode.Spline;
-                    break;
-                case NJD_MTYPE_FN.NJD_MTYPE_USER:
-                    interpoMode = InterpolationMode.User;
-                    break;
-            }
+            interpoMode = (NJD_MTYPE_FN)interpolationFrameSizeCombo & NJD_MTYPE_FN.NJD_MTYPE_MASK;
             int frameSize = (interpolationFrameSizeCombo & 0xF) * 8;
 
             sr.Seek(initialPointer + offset, SeekOrigin.Begin);
@@ -742,13 +735,25 @@ namespace AquaModelLibrary.Data.Ninja.Motion
                             case AnimFlags.Roll:
                                 for (int j = 0; j < counts[f]; j++)
                                 {
-                                    data.Roll.Add(sr.ReadBE<int>(), sr.ReadBE<int>());
+                                    if(BillyMode)
+                                    {
+                                        data.Roll.Add(sr.ReadBE<ushort>(), sr.ReadBE<short>());
+                                    } else
+                                    {
+                                        data.Roll.Add(sr.ReadBE<int>(), sr.ReadBE<int>());
+                                    }
                                 }
                                 break;
                             case AnimFlags.Angle:
                                 for (int j = 0; j < counts[f]; j++)
                                 {
-                                    data.Angle.Add(sr.ReadBE<int>(), sr.ReadBE<int>());
+                                    if(BillyMode)
+                                    {
+                                        data.Angle.Add(sr.ReadBE<ushort>(), sr.ReadBE<short>());
+                                    } else
+                                    {
+                                        data.Angle.Add(sr.ReadBE<int>(), sr.ReadBE<int>());
+                                    }
                                 }
                                 break;
                             case AnimFlags.Color:

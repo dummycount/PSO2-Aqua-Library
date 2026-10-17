@@ -6,7 +6,7 @@ using AquaModelLibrary.Helpers.PSO2;
 using System.Diagnostics;
 using System.Numerics;
 using System.Text;
-using AquaModelLibrary.Helpers.Extensions;
+using AquaModelLibrary.Helpers.Writers;
 using AquaModelLibrary.Data.PSO2.Aqua.AquaCommonData;
 
 namespace AquaModelLibrary.Data.PSO2.Aqua
@@ -580,7 +580,7 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
 
             List<int> vtxeOffsets = new List<int>();
 
-            List<byte> outBytes = new List<byte>();
+            var outBytes = new ByteListWriter();
             List<int> nof0PointerLocations = new List<int>(); //Used for the NOF0 section
 
             //REL0
@@ -1278,7 +1278,7 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
                         objc.ReadVTBF(data);
                         break;
                     case "VSET":
-                        vsetList = ParseVSET(data, out List<List<ushort>> bonePalettes, out List<List<ushort>> edgeVertsLists);
+                        ParseVSET(data, out List<List<ushort>> bonePalettes, out List<List<ushort>> edgeVertsLists);
                         bp = bonePalettes;
                         ev = edgeVertsLists;
                         break;
@@ -1349,10 +1349,8 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
             }
         }
 
-        public static unsafe List<TEXF> ParseTEXF(List<Dictionary<int, object>> texfRaw)
+        public void ParseTEXF(List<Dictionary<int, object>> texfRaw)
         {
-            List<TEXF> texfList = new List<TEXF>();
-
             //Make sure there are texture refs to get
             if (texfRaw[0].Keys.Count > 1)
             {
@@ -1361,16 +1359,15 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
                     texfList.Add(new TEXF((byte[])texfRaw[i][0x80]));
                 }
             }
-            return texfList;
         }
 
         //Technically, this data is written out as a list, but should only ever have one entry.
-        public unsafe void ParseUNRM(List<Dictionary<int, object>> unrmRaw)
+        public void ParseUNRM(List<Dictionary<int, object>> unrmRaw)
         {
             unrms = new UNRM(unrmRaw);
         }
 
-        public unsafe void ParseTSET(List<Dictionary<int, object>> tsetRaw)
+        public void ParseTSET(List<Dictionary<int, object>> tsetRaw)
         {
             for (int i = 0; i < tsetRaw.Count; i++)
             {
@@ -1378,7 +1375,7 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
             }
         }
 
-        public unsafe void ParseTSTA(List<Dictionary<int, object>> tstaRaw)
+        public void ParseTSTA(List<Dictionary<int, object>> tstaRaw)
         {
             //Make sure there are actually textures
             if (tstaRaw[0].Keys.Count > 1)
@@ -1390,39 +1387,29 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
             }
         }
 
-        public static unsafe List<SHAD> ParseSHAD(List<Dictionary<int, object>> shadRaw)
+        public void ParseSHAD(List<Dictionary<int, object>> shadRaw)
         {
-            List<SHAD> shadList = new List<SHAD>();
-
             for (int i = 0; i < shadRaw.Count; i++)
             {
                 shadList.Add(new SHAD(shadRaw[i]));
             }
-
-            return shadList;
         }
 
-        public static unsafe List<REND> ParseREND(List<Dictionary<int, object>> rendRaw)
+        public void ParseREND(List<Dictionary<int, object>> rendRaw)
         {
-            List<REND> rendList = new List<REND>();
 
             for (int i = 0; i < rendRaw.Count; i++)
             {
                 rendList.Add(new REND(rendRaw[i]));
             }
-
-            return rendList;
         }
 
-        public static unsafe List<MATE> ParseMATE(List<Dictionary<int, object>> mateRaw)
+        public void ParseMATE(List<Dictionary<int, object>> mateRaw)
         {
-            List<MATE> mateList = new List<MATE>();
             for (int i = 0; i < mateRaw.Count; i++)
             {
                 mateList.Add(new MATE(mateRaw[i]));
             }
-
-            return mateList;
         }
 
 
@@ -1447,9 +1434,8 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
             }
         }
 
-        public static List<VSET> ParseVSET(List<Dictionary<int, object>> vsetRaw, out List<List<ushort>> bonePalettes, out List<List<ushort>> edgeVertsLists)
+        public void ParseVSET(List<Dictionary<int, object>> vsetRaw, out List<List<ushort>> bonePalettes, out List<List<ushort>> edgeVertsLists)
         {
-            List<VSET> vsetList = new List<VSET>();
             bonePalettes = new List<List<ushort>>();
             edgeVertsLists = new List<List<ushort>>();
 
@@ -1457,11 +1443,17 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
             {
 
                 vsetList.Add(VSET.ParseVSET(vsetRaw[i], out var bonePalette, out var edgeVertsList));
+                if(bonePalette == null)
+                {
+                    bonePalette = new List<ushort>();
+                }
+                if(edgeVertsList == null)
+                {
+                    edgeVertsList = new List<ushort>();
+                }
                 bonePalettes.Add(bonePalette);
                 edgeVertsLists.Add(edgeVertsList);
             }
-
-            return vsetList;
         }
         #endregion
 
@@ -1975,7 +1967,9 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
             }
         }
 
-        //0xC33 variations of the format can recycle vtxl lists for multiple meshes. Neat, but not helpful for conversion purposes.
+        /// <summary>
+        /// 0xC33 variations of the format can recycle vtxl lists for multiple meshes. Neat, but not helpful for conversion purposes.
+        /// </summary>
         public int splitVSETPerMesh()
         {
             if(meshList.Count < 2 || objc.type < 0xC32)
@@ -2119,7 +2113,6 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
                 if (meshMatMapping.Count - 1 != i)
                 {
                     var curMate = mateList[curMesh.mateIndex];
-                    var curRend = rendList[curMesh.rendIndex];
                     var shadNames = GetShaderNames(curMesh.shadIndex);
                     var texNames = GetTexListNamesUnicode(curMesh.tsetIndex);
                     var texUvSets = GetTexListUVChannels(curMesh.tsetIndex);
@@ -2137,10 +2130,14 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
                     {
                         mat.matName = curMate.matName.GetString();
                     }
-                    mat.twoSided = curRend.twosided;
-                    mat.alphaCutoff = curRend.alphaCutoff;
-                    mat.srcAlpha = curRend.sourceAlpha;
-                    mat.destAlpha = curRend.destinationAlpha;
+                    if(rendList.Count > curMesh.rendIndex)
+                    {
+                        var curRend = rendList[curMesh.rendIndex];
+                        mat.twoSided = curRend.twosided;
+                        mat.alphaCutoff = curRend.alphaCutoff;
+                        mat.srcAlpha = curRend.sourceAlpha;
+                        mat.destAlpha = curRend.destinationAlpha;
+                    }
 
                     mat.diffuseRGBA = curMate.diffuseRGBA;
                     mat.unkRGBA0 = curMate.unkRGBA0;

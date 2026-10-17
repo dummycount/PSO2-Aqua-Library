@@ -1,5 +1,5 @@
 ﻿using AquaModelLibrary.Data.Ninja;
-using AquaModelLibrary.Helpers.Extensions;
+using AquaModelLibrary.Helpers.Writers;
 using AquaModelLibrary.Helpers.Readers;
 using System.Text;
 
@@ -61,7 +61,7 @@ namespace AquaModelLibrary.Data.BillyHatcher.ARCData
                 objEntry.model2Id1 = sr.ReadBE<ushort>();
                 objEntry.collision2ModelId0 = sr.ReadBE<ushort>();
                 objEntry.collision2ModelId1 = sr.ReadBE<ushort>();
-                objEntry.int_0C = sr.ReadBE<int>();
+                objEntry.collisionSoundId = sr.ReadBE<int>();
                 objEntry.objectFlags = sr.ReadBE<int>();
                 objEntry.int_14 = sr.ReadBE<int>();
                 objEntry.collisionInfoPtr = sr.ReadBE<int>();
@@ -163,11 +163,10 @@ namespace AquaModelLibrary.Data.BillyHatcher.ARCData
 
         public byte[] GetBytes()
         {
-            ByteListExtension.AddAsBigEndian = true;
             List<int> pofSets = new List<int>();
 
             Dictionary<string, int> group2StructureOffsets = new Dictionary<string, int>();
-            List<byte> outBytes = new List<byte>();
+            var outBytes = new ByteListWriter() { AddAsBigEndian = true };
 
             pofSets.Add(outBytes.Count);
             outBytes.AddValue((int)8);
@@ -253,7 +252,7 @@ namespace AquaModelLibrary.Data.BillyHatcher.ARCData
                 outBytes.AddValue(obj.model2Id1);
                 outBytes.AddValue(obj.collision2ModelId0);
                 outBytes.AddValue(obj.collision2ModelId1);
-                outBytes.AddValue(obj.int_0C);
+                outBytes.AddValue(obj.collisionSoundId);
 
                 outBytes.AddValue(obj.objectFlags);
                 outBytes.AddValue(obj.int_14);
@@ -453,7 +452,7 @@ namespace AquaModelLibrary.Data.BillyHatcher.ARCData
                 outBytes.Add(0);
             }
 
-            var arcBytes = new List<byte>();
+            var arcBytes = new ByteListWriter() { AddAsBigEndian = true };
             arcBytes.AddValue(outBytes.Count + 0x20);
             arcBytes.AddValue(pof0Offset);
             arcBytes.AddValue(pof0.Length);
@@ -469,7 +468,6 @@ namespace AquaModelLibrary.Data.BillyHatcher.ARCData
 
             outBytes.InsertRange(0, arcBytes);
 
-            ByteListExtension.Reset();
             return outBytes.ToArray();
         }
 
@@ -496,7 +494,11 @@ namespace AquaModelLibrary.Data.BillyHatcher.ARCData
             /// Usually only Id1 is used, but some things use Id0.
             /// </summary>
             public ushort collision2ModelId1;
-            public int int_0C;
+            /// <summary>
+            /// Sound id of the sound that plays when the object is touched.
+            /// 0-2 are the normal breaking sounds. 3 is the bomb sound, 4 is silent, 5 is a grass rustle. 6+ is a crash.
+            /// </summary>
+            public int collisionSoundId;
 
             public int objectFlags;
             /// <summary>
@@ -615,6 +617,9 @@ namespace AquaModelLibrary.Data.BillyHatcher.ARCData
 
         public struct DamageInfo
         {
+            /// <summary>
+            /// Damage done to the player and eggs
+            /// </summary>
             public int damage;
             public int int_04;
         }

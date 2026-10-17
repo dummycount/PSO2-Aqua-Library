@@ -64,6 +64,10 @@ namespace AquaModelLibrary.Data.PSO2.Aqua.AquaObjectData
         //Holds processed weight info for accessing in external applications
         public List<Vector4> trueVertWeights = new List<Vector4>();
         public List<int[]> trueVertWeightIndices = new List<int[]>();
+
+        //Morph/Blendtarget data. There should be one delta in each channel per vert position in the vtxl
+        public List<string> blendTargetChannelNames = new List<string>();
+        public List<List<Vector3>> blendTargetDeltas = new List<List<Vector3>>();
         #endregion
 
         #region Constructors
@@ -71,12 +75,13 @@ namespace AquaModelLibrary.Data.PSO2.Aqua.AquaObjectData
 
         public VTXL(List<Dictionary<int, object>> vtxlRaw, VTXE vtxe)
         {
-            int vertCount = ((byte[])vtxlRaw[0][0xBA]).Length / vtxe.GetVTXESize();
+            int vtxeSize = vtxe.GetVTXESize();
+            int vertCount = ((byte[])vtxlRaw[0][0xBA]).Length / vtxeSize;
 
             using (MemoryStream stream = new MemoryStream((byte[])vtxlRaw[0][0xBA]))
             using (var streamReader = new BufferedStreamReaderBE<MemoryStream>(stream))
             {
-                Read(streamReader, vtxe, vertCount, vtxe.vertDataTypes.Count);
+                Read(streamReader, vtxe, vertCount, vtxeSize);
             }
         }
 
@@ -1927,6 +1932,8 @@ namespace AquaModelLibrary.Data.PSO2.Aqua.AquaObjectData
             newVTXL.rawFaceId = new List<int>(rawFaceId);
             newVTXL.trueVertWeights = new List<Vector4>(trueVertWeights);
             newVTXL.trueVertWeightIndices = trueVertWeightIndices.ConvertAll(wt => (int[])wt.Clone()).ToList();
+            newVTXL.blendTargetChannelNames = new List<string>(blendTargetChannelNames);
+            newVTXL.blendTargetDeltas = blendTargetDeltas.ConvertAll(dlt => dlt.ToList());
 
             return newVTXL;
         }

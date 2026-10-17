@@ -4,8 +4,10 @@ namespace AquaModelLibrary.Data.BluePoint.CGPR
 {
     public class CGPR
     {
+        public bool wasCompressed = false;
         public BPEra era;
         public List<CGPRObject> objects = new List<CGPRObject>();
+        public List<CGPRMetadata> metadataList = new List<CGPRMetadata>();
         public CFooter cfooter;
         public int cgprObjCount;
         public int int_04; //For 0 count cgpr
@@ -16,7 +18,7 @@ namespace AquaModelLibrary.Data.BluePoint.CGPR
         }
         public CGPR(byte[] file)
         {
-            file = CompressionHandler.CheckCompression(file);
+            file = CompressionHandler.CheckCompression(file, out wasCompressed);
             using (MemoryStream ms = new MemoryStream(file))
             using (BufferedStreamReaderBE<MemoryStream> sr = new BufferedStreamReaderBE<MemoryStream>(ms))
             {
@@ -33,6 +35,7 @@ namespace AquaModelLibrary.Data.BluePoint.CGPR
             {
                 int_04 = sr.Read<int>();
                 cfooter = sr.Read<CFooter>();
+                return; 
             }
 
             era = BPEra.None;
@@ -47,9 +50,11 @@ namespace AquaModelLibrary.Data.BluePoint.CGPR
 
             var taggedEnd = sr.Position;
 
-            //Read the non tagged objects. There's one of these per tagged object
-            for(int i = 0; i < cgprObjCount; i++)
+            //Read metadata
+            var metaDataCount = sr.Read<int>();
+            for(int i = 0; i < metaDataCount; i++)
             {
+                metadataList.Add(new CGPRMetadata(sr, era));
             }
         }
     }

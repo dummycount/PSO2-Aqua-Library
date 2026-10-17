@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="DrSwizzler" Version="1.2.1" />
     <PackageReference Include="prs_rs.Net.Sys" Version="2.0.3" />
     <PackageReference Include="Reloaded.Memory" Version="9.4.3" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
@@ -53,8 +54,6 @@
 
   <ItemGroup>
     <Folder Include="AM2\AfterBurnerClimax\" />
-    <Folder Include="Ninja\Model\Basic\" />
-    <Folder Include="Ninja\Model\Chunk\" />
   </ItemGroup>
 
 </Project>

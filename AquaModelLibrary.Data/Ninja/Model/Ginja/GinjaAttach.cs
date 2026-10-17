@@ -2,12 +2,15 @@
 using AquaModelLibrary.Data.PSO2.Aqua;
 using AquaModelLibrary.Data.PSO2.Aqua.AquaObjectData;
 using AquaModelLibrary.Data.PSO2.Aqua.AquaObjectData.Intermediary;
-using AquaModelLibrary.Helpers.Extensions;
+using AquaModelLibrary.Helpers.Writers;
 using AquaModelLibrary.Helpers.Readers;
 using System.Numerics;
 
 namespace AquaModelLibrary.Data.Ninja.Model.Ginja
 {
+    /// <summary>
+    /// Handling based on SA Tools implementation https://github.com/X-Hax/sa_tools
+    /// </summary>
     public class GinjaAttach : Attach
     {
         public GinjaVertexData vertData = null;
@@ -292,7 +295,7 @@ namespace AquaModelLibrary.Data.Ninja.Model.Ginja
             using (var ms = new MemoryStream(file))
             using (var sr = new BufferedStreamReaderBE<MemoryStream>(ms))
             {
-                Read(sr, be);
+                Read(sr, be, offset);
             }
         }
 
@@ -352,7 +355,7 @@ namespace AquaModelLibrary.Data.Ninja.Model.Ginja
             }
         }
 
-        public void Write(List<byte> outBytes, List<int> POF0Offsets)
+        public void Write(ByteListWriter outBytes, List<int> POF0Offsets)
         {
             string attachAddress = outBytes.Count.ToString();
             if (vertData?.elements?.Count > 0)
@@ -429,7 +432,7 @@ namespace AquaModelLibrary.Data.Ninja.Model.Ginja
             }
         }
 
-        public void WriteMesh(List<byte> outBytes, List<int> POF0Offsets, List<GinjaMesh> meshList, string type)
+        public void WriteMesh(ByteListWriter outBytes, List<int> POF0Offsets, List<GinjaMesh> meshList, string type)
         {
             for (int i = 0; i < meshList.Count; i++)
             {
@@ -450,7 +453,7 @@ namespace AquaModelLibrary.Data.Ninja.Model.Ginja
             }
         }
 
-        public void WriteMeshDataParameters(List<byte> outBytes, List<int> POF0Offsets, List<GinjaMesh> meshList, string type)
+        public void WriteMeshDataParameters(ByteListWriter outBytes, List<int> POF0Offsets, List<GinjaMesh> meshList, string type)
         {
             //Parameters
             for (int i = 0; i < meshList.Count; i++)
@@ -465,7 +468,7 @@ namespace AquaModelLibrary.Data.Ninja.Model.Ginja
                 }
             }
         }
-        public void WriteMeshDataPrimitives(List<byte> outBytes, List<int> POF0Offsets, List<GinjaMesh> meshList, string type)
+        public void WriteMeshDataPrimitives(ByteListWriter outBytes, List<int> POF0Offsets, List<GinjaMesh> meshList, string type)
         {
             GCIndexAttributeFlags indexFlags = GCIndexAttributeFlags.Position16BitIndex;
             //Primitives

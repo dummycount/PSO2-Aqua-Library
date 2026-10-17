@@ -1,7 +1,7 @@
 ﻿using AquaModelLibrary.Data.PSO2.Aqua.AquaCommonData;
 using AquaModelLibrary.Data.PSO2.Aqua.AquaMotionData;
 using AquaModelLibrary.Helpers;
-using AquaModelLibrary.Helpers.Extensions;
+using AquaModelLibrary.Helpers.Writers;
 using AquaModelLibrary.Helpers.PSO2;
 using AquaModelLibrary.Helpers.Readers;
 using System.Diagnostics;
@@ -13,7 +13,7 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
     //Though the NIFL format is used for storage, VTBF format tag references for data will be commented where appropriate. Some offset/reserve related things are NIFL only, however.
 
     //Cameras, UV, and standard motions are essentially the same format.
-    public unsafe class AquaMotion : AquaCommon
+    public partial class AquaMotion : AquaCommon
     {
         public MOHeader moHeader;
         public List<KeyData> motionKeys = new List<KeyData>();
@@ -154,16 +154,9 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
                     case "ROOT":
                         //We don't do anything with this right now.
                         break;
-                    case "NDMO":
-                        //Signifies a 3d motion
-                        moHeader = new MOHeader(data);
-                        break;
-                    case "SPMO":
-                        //Signifies a material animation
-                        moHeader = new MOHeader(data);
-                        break;
-                    case "CAMO":
-                        //Signifies a camera motion
+                    case "NDMO": //Signifies a 3d motion
+                    case "SPMO": //Signifies a material animation
+                    case "CAMO": //Signifies a camera motion
                         moHeader = new MOHeader(data);
                         break;
                     case "MSEG":
@@ -193,7 +186,7 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
 
             List<int> boneOffAddresses = new List<int>();
 
-            List<byte> outBytes = new List<byte>();
+            var outBytes = new ByteListWriter();
             List<int> nof0PointerLocations = new List<int>(); //Used for the NOF0 section
 
             //REL0

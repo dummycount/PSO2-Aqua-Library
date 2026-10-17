@@ -1,5 +1,5 @@
 ﻿using AquaModelLibrary.Data.Ninja;
-using AquaModelLibrary.Helpers.Extensions;
+using AquaModelLibrary.Helpers.Writers;
 using System.Numerics;
 using static AquaModelLibrary.Data.BillyHatcher.LND;
 using static AquaModelLibrary.Data.Ninja.NinjaConstants;
@@ -32,7 +32,7 @@ namespace AquaModelLibrary.Data.BillyHatcher.LNDH
         public byte[] GetBytes(int offset, List<ARCLNDAnimatedMeshData> arcLndAnimatedMeshDataList, out List<int> offsets)
         {
             offsets = new List<int>();
-            List<byte> outBytes = new List<byte>();
+            var outBytes = new ByteListWriter() { AddAsBigEndian = true };
 
             if (isAnimModel == false)
             {
@@ -206,7 +206,7 @@ namespace AquaModelLibrary.Data.BillyHatcher.LNDH
             for (int i = 0; i < arcBoundingList.Count; i++)
             {
                 var bounds = arcBoundingList[i];
-                outBytes.AddValue(bounds.unkFlt_00);
+                outBytes.AddValue(bounds.flags);
                 outBytes.AddValue(bounds.usht_04);
                 outBytes.AddValue(bounds.usht_06);
                 outBytes.AddValue(bounds.usht_08);
@@ -283,7 +283,7 @@ namespace AquaModelLibrary.Data.BillyHatcher.LNDH
                     outBytes.ReserveInt($"AnimatedModel{i}");
                     offsets.Add(outBytes.Count + offset);
                     outBytes.ReserveInt($"AnimatedMotion{i}");
-                    outBytes.AddValue(arcLndAnimatedMeshDataList[i].MPLAnimId);
+                    outBytes.AddValue(arcLndAnimatedMeshDataList[i].MPLAnimKey);
                 }
                 outBytes.AlignWriter(0x20);
                 for (int i = 0; i < arcLndAnimatedMeshDataList.Count; i++)
@@ -291,10 +291,10 @@ namespace AquaModelLibrary.Data.BillyHatcher.LNDH
                     outBytes.FillInt($"AnimatedModel{i}", outBytes.Count + offset);
                     outBytes.AddRange(arcLndAnimatedMeshDataList[i].model.GetBytes(outBytes.Count + offset, new List<ARCLNDAnimatedMeshData>(), out var animModelOffsets));
                     offsets.AddRange(animModelOffsets);
-                    if(arcLndAnimatedMeshDataList[i].motion != null)
+                    if(arcLndAnimatedMeshDataList[i].altVertColors != null)
                     {
                         outBytes.FillInt($"AnimatedMotion{i}", outBytes.Count + offset);
-                        outBytes.AddRange(arcLndAnimatedMeshDataList[i].motion.GetBytes(outBytes.Count + offset, out var animOffsets));
+                        outBytes.AddRange(arcLndAnimatedMeshDataList[i].altVertColors.GetBytes(outBytes.Count + offset, out var animOffsets));
                         offsets.AddRange(animOffsets);
                     }
                     outBytes.AlignWriter(0x20);
@@ -504,7 +504,7 @@ namespace AquaModelLibrary.Data.BillyHatcher.LNDH
         public byte[] GetVertDataBytes(int offset, out List<int> offsets)
         {
             offsets = new List<int>();
-            List<byte> outBytes = new List<byte>();
+            var outBytes = new ByteListWriter() { AddAsBigEndian = true };
             outBytes.AddValue((ushort)1);
             outBytes.AddValue((ushort)PositionData.Count);
 
@@ -656,9 +656,9 @@ namespace AquaModelLibrary.Data.BillyHatcher.LNDH
     public class ARCLNDNodeBounding
     {
         /// <summary>
-        /// Some kind of epsilon or maybe a struct magic? Really unsure. Always the same.
+        /// 0x3F for static geo, 0x24 or 0x26 for animated
         /// </summary>
-        public float unkFlt_00 = 8.82818E-44f;
+        public int flags = 0x3F;
         /// <summary>
         /// Always 0
         /// </summary>
@@ -737,7 +737,7 @@ namespace AquaModelLibrary.Data.BillyHatcher.LNDH
     public class ARCLNDAnimatedMeshRefSet
     {
         public int modelOffset;
-        public int motionOffset;
-        public int MPLAnimId;
+        public int altVertColorsOffset;
+        public int MPLAnimKey;
     }
 }
