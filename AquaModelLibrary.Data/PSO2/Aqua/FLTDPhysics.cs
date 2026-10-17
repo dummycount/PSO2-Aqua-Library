@@ -8,7 +8,7 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
     public class FLTDPhysics : AquaCommon
     {
         public FltdHeader header = null;
-        public UnkStructNGS ngsStruct = null;
+        public UnknownStructNGS ngsStruct = null;
         public List<MainPhysicsNode> mainNodes = new List<MainPhysicsNode>();
         public List<unkStruct1> subStructs = new List<unkStruct1>();
 
@@ -61,7 +61,7 @@ namespace AquaModelLibrary.Data.PSO2.Aqua
             public int unkStructNGSOffset;
         }
 
-        public class UnkStructNGS
+        public class UnknownStructNGS
         {
             public unkStructNGS ngsStruct;
             //public unkEndStruct
